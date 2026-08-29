@@ -1,0 +1,1 @@
+ALTER TABLE "outbox_events" ADD CONSTRAINT "chk_outbox_type" CHECK ("outbox_events"."type" IN ('conversation.created', 'conversation.delete_requested', 'message.appended', 'generation.requested', 'generation.closed', 'usage.recorded', 'grounding.fallback_used', 'session.token_reuse_detected'));

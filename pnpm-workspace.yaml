@@ -6,8 +6,20 @@ packages:
 # Nothing enters the tree before a takeover would have been noticed and yanked.
 minimumReleaseAge: 4320 # 3 days, in minutes
 
-# unrs-resolver is the native module behind eslint-import-resolver-typescript.
-# Without its postinstall the resolver cannot load and import rules go quiet
-# instead of failing, so the build is allowed deliberately rather than ignored.
+# Each entry is a decision, not a default. A postinstall runs arbitrary code on
+# the machine that installs, so the ones allowed here are the ones something
+# genuinely stops working without.
 allowBuilds:
+  # The native module behind eslint-import-resolver-typescript. Without its
+  # postinstall the resolver cannot load and the import rules go quiet instead
+  # of failing.
   unrs-resolver: true
+  # drizzle-kit loads drizzle.config.ts through esbuild, whose postinstall places
+  # the platform binary. Without it the migration tooling cannot start.
+  esbuild: true
+  # Optional native accelerations for the SSH transport testcontainers can use.
+  # Both fall back to pure JavaScript, so compiling here buys nothing.
+  cpu-features: false
+  ssh2: false
+  # Installs a code-generation CLI we never invoke.
+  protobufjs: false

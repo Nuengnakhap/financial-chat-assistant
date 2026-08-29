@@ -2,9 +2,11 @@ import { defineConfig } from 'vitest/config';
 
 /**
  * Coverage covers `packages/*` and `apps/api` alike: an uncovered branch is a
- * rule nobody has tested, wherever it lives. `main.ts` is the one exception —
- * it starts a process and listens, which a unit test cannot do without becoming
- * a worse copy of actually running the app.
+ * rule nobody has tested, wherever it lives.
+ *
+ * `pnpm test:coverage` therefore runs the integration project too and needs
+ * Docker — persistence is deliberately tested against a real PostgreSQL, and
+ * measuring without it would report that layer as untested when it is not.
  */
 export default defineConfig({
   test: {
@@ -25,6 +27,22 @@ export default defineConfig({
           root: './apps/api',
           environment: 'node',
           include: ['src/**/*.spec.ts'],
+          exclude: ['src/**/*.int.spec.ts'],
+        },
+      },
+      {
+        // Needs Docker, so it stays out of `pnpm test` and `pnpm check`; run it
+        // with `pnpm test:integration`. Persistence is tested against a real
+        // PostgreSQL because a fake cannot reject a CHECK constraint.
+        test: {
+          name: 'integration',
+          root: './apps/api',
+          environment: 'node',
+          include: ['src/**/*.int.spec.ts'],
+          globalSetup: ['src/shared/persistence/__tests__/global-setup.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 180_000,
+          fileParallelism: false,
         },
       },
       {
@@ -43,7 +61,10 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'lcov'],
       include: ['packages/*/src/**/*.ts', 'apps/api/src/**/*.ts'],
-      exclude: ['**/*.spec.ts', '**/index.ts', 'apps/api/src/main.ts'],
+      // `__tests__` is test infrastructure, not product code; `main.ts` starts a
+      // process, which a unit test cannot do without becoming a worse copy of
+      // running the app.
+      exclude: ['**/__tests__/**', '**/index.ts', 'apps/api/src/main.ts'],
       thresholds: { statements: 95, branches: 95, functions: 95, lines: 95 },
     },
   },

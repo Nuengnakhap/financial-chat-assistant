@@ -23,10 +23,13 @@
     "lint:dead": "knip",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
+    "test": "vitest run --project '!integration'",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check": "pnpm build && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test"
+    "check": "pnpm build && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
+    "test:integration": "vitest run --project integration",
+    "db:migrate": "pnpm --filter @fca/api db:migrate",
+    "db:generate": "pnpm --filter @fca/api db:generate"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
