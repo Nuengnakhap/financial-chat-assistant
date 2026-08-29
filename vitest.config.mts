@@ -1,20 +1,20 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * Coverage thresholds apply to the domain package only: it is pure logic with no
- * I/O, so an uncovered branch there is a rule nobody has tested.
+ * Coverage thresholds apply to every package under `packages/*`: they are pure
+ * logic with no I/O, so an uncovered branch is a rule nobody has tested.
  */
 export default defineConfig({
   test: {
     projects: [
-      {
+      ...['domain', 'config', 'contracts'].map((name) => ({
         test: {
-          name: 'domain',
-          root: './packages/domain',
-          environment: 'node',
+          name,
+          root: `./packages/${name}`,
+          environment: 'node' as const,
           include: ['src/**/*.spec.ts'],
         },
-      },
+      })),
       {
         test: {
           name: 'architecture',
@@ -30,7 +30,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'lcov'],
-      include: ['packages/domain/src/**/*.ts'],
+      include: ['packages/*/src/**/*.ts'],
       exclude: ['**/*.spec.ts', '**/index.ts'],
       thresholds: { statements: 95, branches: 95, functions: 95, lines: 95 },
     },

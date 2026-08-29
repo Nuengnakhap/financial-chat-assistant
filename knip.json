@@ -9,6 +9,14 @@
     "packages/domain": {
       "entry": ["src/index.ts", "src/**/*.spec.ts"],
       "project": ["src/**/*.ts"]
+    },
+    "packages/config": {
+      "entry": ["src/index.ts", "src/**/*.spec.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/contracts": {
+      "entry": ["src/index.ts", "src/**/*.spec.ts"],
+      "project": ["src/**/*.ts"]
     }
   }
 }
