@@ -5,7 +5,7 @@
   "description": "Chat application answering questions about U.S. public company financials, grounded in SQL query results",
   "packageManager": "pnpm@11.18.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9"
   },
   "scripts": {
     "infra:up": "docker compose -f infra/docker-compose.yml up -d --wait",
@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tools/tsconfig.json --noEmit && pnpm -r --if-present typecheck",
     "lint": "pnpm lint:code && pnpm lint:deps && pnpm lint:dead",
     "lint:code": "eslint .",
-    "lint:deps": "depcruise packages tools scripts eslint.config.mjs vitest.config.mts",
+    "lint:deps": "depcruise packages apps tools scripts eslint.config.mjs vitest.config.mts",
     "lint:dead": "knip",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

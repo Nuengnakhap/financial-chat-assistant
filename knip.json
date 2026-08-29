@@ -17,6 +17,11 @@
     "packages/contracts": {
       "entry": ["src/index.ts", "src/**/*.spec.ts"],
       "project": ["src/**/*.ts"]
+    },
+    "apps/api": {
+      "entry": ["src/main.ts", "src/**/*.spec.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["pino-pretty"]
     }
   }
 }

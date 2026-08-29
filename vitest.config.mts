@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * Coverage thresholds apply to every package under `packages/*`: they are pure
- * logic with no I/O, so an uncovered branch is a rule nobody has tested.
+ * Coverage covers `packages/*` and `apps/api` alike: an uncovered branch is a
+ * rule nobody has tested, wherever it lives. `main.ts` is the one exception —
+ * it starts a process and listens, which a unit test cannot do without becoming
+ * a worse copy of actually running the app.
  */
 export default defineConfig({
   test: {
@@ -15,6 +17,16 @@ export default defineConfig({
           include: ['src/**/*.spec.ts'],
         },
       })),
+      {
+        // Legacy decorators and `emitDecoratorMetadata` are read from
+        // apps/api/tsconfig.json by the default transform — see the note there.
+        test: {
+          name: 'api',
+          root: './apps/api',
+          environment: 'node',
+          include: ['src/**/*.spec.ts'],
+        },
+      },
       {
         test: {
           name: 'architecture',
@@ -30,8 +42,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'lcov'],
-      include: ['packages/*/src/**/*.ts'],
-      exclude: ['**/*.spec.ts', '**/index.ts'],
+      include: ['packages/*/src/**/*.ts', 'apps/api/src/**/*.ts'],
+      exclude: ['**/*.spec.ts', '**/index.ts', 'apps/api/src/main.ts'],
       thresholds: { statements: 95, branches: 95, functions: 95, lines: 95 },
     },
   },

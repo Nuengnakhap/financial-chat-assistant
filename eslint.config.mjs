@@ -50,6 +50,8 @@ export default tseslint.config(
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
       '@typescript-eslint/no-import-type-side-effects': 'error',
+      // Every NestJS module is an empty class carrying a decorator.
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
       '@typescript-eslint/switch-exhaustiveness-check': [
         'error',
         { considerDefaultExhaustiveForUnions: true },
