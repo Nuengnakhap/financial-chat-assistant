@@ -8,6 +8,7 @@ import { testConfig } from '../../config/__tests__/test-config';
 import { APP_CONFIG } from '../../config/app-config.token';
 import { AppLogger, createPinoLogger } from '../../observability/app-logger';
 import { HEALTH_INDICATORS, READINESS_TIMEOUT_MS, type HealthIndicator } from '../health-indicator';
+import { ReadinessProbe } from '../readiness';
 
 let app: NestFastifyApplication | undefined;
 
@@ -82,6 +83,17 @@ describe('readiness', () => {
     const response = await get('/healthz/ready');
 
     expect(response.statusCode).toBe(503);
+  });
+
+  it('refuses traffic once shutdown has begun, while every dependency is still healthy', async () => {
+    const booted = await boot([{ name: 'db', check: () => Promise.resolve() }]);
+    expect((await get('/healthz/ready')).statusCode).toBe(200);
+
+    booted.get(ReadinessProbe).refuse();
+
+    expect((await get('/healthz/ready')).statusCode).toBe(503);
+    // Liveness stays true: this process is stopping, not broken.
+    expect((await get('/healthz/live')).statusCode).toBe(200);
   });
 
   it('says nothing about which dependency failed', async () => {

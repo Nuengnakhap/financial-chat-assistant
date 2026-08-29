@@ -17,6 +17,7 @@ export async function createApp(): Promise<NestFastifyApplication> {
   });
 
   app.useLogger(new NestLoggerBridge(app.get(AppLogger)));
-  app.enableShutdownHooks();
+  // No `enableShutdownHooks()`: it installs its own signal handlers that call
+  // `close()` straight away, racing the ordered sequence in `main.ts`.
   return app;
 }

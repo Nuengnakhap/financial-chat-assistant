@@ -2,10 +2,12 @@ import { loadConfig, type AppConfig } from '@fca/config';
 import { Global, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 
+import { TaskRegistry } from './bootstrap/task-registry';
 import { APP_CONFIG } from './shared/config/app-config.token';
 import { CpuModule } from './shared/cpu/cpu.module';
 import { HEALTH_INDICATORS, READINESS_TIMEOUT_MS } from './shared/health/health-indicator';
 import { HealthController } from './shared/health/health.controller';
+import { ReadinessProbe } from './shared/health/readiness';
 import { DomainErrorFilter } from './shared/http/domain-error.filter';
 import { AppLogger, createPinoLogger } from './shared/observability/app-logger';
 import { DatabaseService } from './shared/persistence/database.service';
@@ -35,6 +37,8 @@ import { RedisService } from './shared/redis/redis.service';
         ),
       inject: [APP_CONFIG],
     },
+    ReadinessProbe,
+    TaskRegistry,
     // What "ready" means, stated in one place: a request cannot be served
     // without either of these. Listing them here rather than letting each module
     // provide the token is what stops a second list from silently replacing the first.
@@ -46,6 +50,6 @@ import { RedisService } from './shared/redis/redis.service';
     { provide: READINESS_TIMEOUT_MS, useValue: 1_000 },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
   ],
-  exports: [APP_CONFIG, AppLogger],
+  exports: [APP_CONFIG, AppLogger, ReadinessProbe, TaskRegistry],
 })
 export class AppModule {}

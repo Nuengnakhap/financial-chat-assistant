@@ -15,7 +15,18 @@ export interface LogContext {
   readonly durationMs?: number;
   /** Which component emitted the line — a class name, never a value. */
   readonly scope?: string;
+  /** The name a background task registered under, never its input. */
+  readonly task?: string;
   readonly err?: Error;
+}
+
+/**
+ * `err` stays typed as `Error` rather than widening to `unknown`, or a caught
+ * value carrying message content could be logged. This is how a caught value
+ * gets in: once, here, instead of at every `catch`.
+ */
+export function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 export interface LoggerOptions {
