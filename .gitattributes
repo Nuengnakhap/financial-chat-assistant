@@ -1,0 +1,34 @@
+# Line endings are LF in the repository and in every working tree, regardless of
+# the contributor's platform or their core.autocrlf setting. Shell scripts and
+# files copied into containers break with CRLF, and mixed endings turn ordinary
+# reviews into whole-file diffs.
+* text=auto eol=lf
+
+# Windows-only scripts are the exception: they need CRLF to run reliably.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets: never normalised, never diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Generated or data files. Still versioned and still diffable locally, but
+# collapsed in review because reading them line by line tells you nothing.
+pnpm-lock.yaml linguist-generated=true
+data/financial_data.sql linguist-generated=true
+
+# Better hunk headers when diffing source.
+*.ts diff=typescript
+*.tsx diff=typescript
+*.js diff=javascript
+*.mjs diff=javascript
+*.md diff=markdown
+*.css diff=css
+*.html diff=html
