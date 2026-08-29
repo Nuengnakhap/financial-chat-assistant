@@ -2,6 +2,13 @@
 
 export { assertNever } from './assert';
 export {
+  DOMAIN_EVENT_TYPES,
+  isDomainEventType,
+  type DomainEvent,
+  type DomainEventType,
+  type JsonValue,
+} from './events';
+export {
   BudgetExceededError,
   ConflictError,
   DomainError,
