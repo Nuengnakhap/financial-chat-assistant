@@ -44,6 +44,10 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
 - Every HTTP body and SSE event is defined once in `packages/contracts` and
   imported by both sides. Money crosses the wire as a micro-USD string, never a
   JSON number. An unknown SSE event is skipped, never fatal.
+- A response never carries a developer message, an exception name or a stack.
+  `DomainErrorFilter` maps a code to a status and to wording written for a person.
+- `LogContext` is the closed set of fields a log line may carry. Adding message
+  content is a compile error, not a review comment.
 - Generation is detached from the HTTP connection: a command creates the message
   and an outbox event; a runner produces events into a Redis Stream; clients
   attach/resume over SSE with `Last-Event-ID`. Disconnect ≠ stop; stopping is an
@@ -53,7 +57,7 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
 
 ## Stack (pinned — verify against the registry before changing)
 
-Node 22 · **TypeScript 6.0** · NestJS 11 on Fastify · Vite 8 + React 19 ·
+Node 22.9+ · **TypeScript 6.0** · NestJS 11 on Fastify · Vite 8 + React 19 ·
 Drizzle ORM 0.45 + drizzle-kit · PostgreSQL 18 · Redis 8 · zod 4 ·
 openai SDK (OpenAI-compatible via `OPENAI_BASE_URL`) · BullMQ · vitest 4 ·
 ESLint 10 + typescript-eslint 8 · dependency-cruiser 18 · knip 6 ·

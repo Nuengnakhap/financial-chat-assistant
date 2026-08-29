@@ -10,13 +10,14 @@ dataset does not cover a question, the assistant says so instead of estimating.
 
 This repository is under active development. What works today:
 
-| Area                                                   | State                |
-| ------------------------------------------------------ | -------------------- |
-| Data stack (PostgreSQL, Redis, seed, privilege model)  | Working and verified |
-| Toolchain (types, lint, boundaries, dead code, tests)  | Working and verified |
-| Domain model (results, errors, ids, money, lifecycles) | Working and verified |
-| Contracts and configuration (HTTP, SSE, environment)   | Working and verified |
-| Application (API, chat UI, streaming, grounding)       | Not built yet        |
+| Area                                                    | State                |
+| ------------------------------------------------------- | -------------------- |
+| Data stack (PostgreSQL, Redis, seed, privilege model)   | Working and verified |
+| Toolchain (types, lint, boundaries, dead code, tests)   | Working and verified |
+| Domain model (results, errors, ids, money, lifecycles)  | Working and verified |
+| Contracts and configuration (HTTP, SSE, environment)    | Working and verified |
+| API platform (Nest on Fastify, health, errors, logging) | Working and verified |
+| Application (auth, chat UI, streaming, grounding)       | Not built yet        |
 
 The commands below are the ones that run today. This section will grow as
 features land.
@@ -100,6 +101,7 @@ table, or run an expensive query.
 ## Project structure
 
 ```text
+apps/api/            NestJS on Fastify — see its README
 packages/domain/     Framework-free business rules — see its README
 packages/contracts/  Every HTTP body and SSE event, shared by API and web
 packages/config/     Environment parsing and typed configuration
@@ -110,7 +112,7 @@ tools/               Lint rules and the tests that prove the boundary rules work
 AGENTS.md            Operating rules for AI assistants working in this repository
 ```
 
-`apps/api` and `apps/web` land as development continues.
+`apps/web` lands as development continues.
 
 ### How the layers are kept apart
 
@@ -140,20 +142,21 @@ streaming and tool calling.
 
 ## Scripts
 
-| Command            | Description                                                |
-| ------------------ | ---------------------------------------------------------- |
-| `pnpm infra:up`    | Start PostgreSQL and Redis, waiting until both are healthy |
-| `pnpm infra:down`  | Stop the containers, keeping data                          |
-| `pnpm infra:reset` | Stop the containers and delete their volumes               |
-| `pnpm infra:logs`  | Follow container logs                                      |
-| `pnpm db:seed`     | Load the dataset, apply grants, create indexes             |
-| `pnpm db:verify`   | Run the checks shown above                                 |
-| `pnpm check`       | Everything below, in order — what CI runs                  |
-| `pnpm format`      | Apply Prettier (`format:check` only reports)               |
-| `pnpm typecheck`   | `tsc --noEmit` per package, tests included                 |
-| `pnpm lint`        | ESLint, then dependency-cruiser, then knip                 |
-| `pnpm test`        | Vitest (`test:watch`, `test:coverage`)                     |
-| `pnpm build`       | Emit `dist/` for every package, in dependency order        |
+| Command                        | Description                                                |
+| ------------------------------ | ---------------------------------------------------------- |
+| `pnpm infra:up`                | Start PostgreSQL and Redis, waiting until both are healthy |
+| `pnpm infra:down`              | Stop the containers, keeping data                          |
+| `pnpm infra:reset`             | Stop the containers and delete their volumes               |
+| `pnpm infra:logs`              | Follow container logs                                      |
+| `pnpm db:seed`                 | Load the dataset, apply grants, create indexes             |
+| `pnpm db:verify`               | Run the checks shown above                                 |
+| `pnpm check`                   | Everything below, in order — what CI runs                  |
+| `pnpm format`                  | Apply Prettier (`format:check` only reports)               |
+| `pnpm typecheck`               | `tsc --noEmit` per package, tests included                 |
+| `pnpm lint`                    | ESLint, then dependency-cruiser, then knip                 |
+| `pnpm test`                    | Vitest (`test:watch`, `test:coverage`)                     |
+| `pnpm build`                   | Emit `dist/` for every package, in dependency order        |
+| `pnpm --filter @fca/api start` | Run the built API on `API_PORT`                            |
 
 ## Troubleshooting
 
