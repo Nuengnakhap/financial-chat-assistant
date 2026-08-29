@@ -97,13 +97,18 @@ describe('readiness', () => {
   });
 
   it('says nothing about which dependency failed', async () => {
+    // Names long enough not to collide with the random request id in the body:
+    // a two-letter name would match one of these responses in about ten.
     await boot([
-      { name: 'db', check: () => Promise.reject(new Error('password authentication failed')) },
+      {
+        name: 'primary-datastore',
+        check: () => Promise.reject(new Error('password authentication failed')),
+      },
     ]);
 
     const response = await get('/healthz/ready');
 
     expect(response.body).not.toContain('password');
-    expect(response.body).not.toContain('db');
+    expect(response.body).not.toContain('primary-datastore');
   });
 });
