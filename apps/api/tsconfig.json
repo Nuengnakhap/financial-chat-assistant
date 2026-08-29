@@ -1,5 +1,6 @@
 {
   // Editor, ESLint and `pnpm typecheck`. Covers tests, so type-aware rules reach them.
+
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
@@ -7,10 +8,8 @@
     "declaration": false,
     "declarationMap": false,
     "types": ["node"],
-    // NestJS resolves constructor dependencies from `design:paramtypes`, which
-    // only exists when the compiler emits it. Verified in src/__tests__.
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "drizzle.config.ts"]
 }

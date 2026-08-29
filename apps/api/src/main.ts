@@ -2,8 +2,8 @@ import 'reflect-metadata';
 
 import type { AppConfig } from '@fca/config';
 
-import { APP_CONFIG } from './app.module';
 import { createApp } from './create-app';
+import { APP_CONFIG } from './shared/config/app-config.token';
 import { AppLogger } from './shared/observability/app-logger';
 
 async function bootstrap(): Promise<void> {

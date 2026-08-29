@@ -4,7 +4,8 @@
     ".": {
       "entry": ["scripts/*.mjs", "tools/**/*.spec.ts"],
       "project": ["scripts/**/*.mjs", "tools/**/*.{ts,mjs}"],
-      "ignore": ["tools/architecture/fixtures/**"]
+      "ignore": ["tools/architecture/fixtures/**"],
+      "ignoreUnresolved": ["src/shared/persistence/__tests__/global-setup.ts"]
     },
     "packages/domain": {
       "entry": ["src/index.ts", "src/**/*.spec.ts"],
@@ -19,7 +20,11 @@
       "project": ["src/**/*.ts"]
     },
     "apps/api": {
-      "entry": ["src/main.ts", "src/**/*.spec.ts"],
+      "entry": [
+        "src/main.ts",
+        "src/**/*.spec.ts",
+        "src/shared/persistence/__tests__/global-setup.ts"
+      ],
       "project": ["src/**/*.ts"],
       "ignoreDependencies": ["pino-pretty"]
     }

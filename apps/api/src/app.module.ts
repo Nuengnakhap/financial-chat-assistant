@@ -2,12 +2,12 @@ import { loadConfig, type AppConfig } from '@fca/config';
 import { Global, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 
-import { HEALTH_INDICATORS, READINESS_TIMEOUT_MS } from './shared/health/health-indicator';
+import { APP_CONFIG } from './shared/config/app-config.token';
+import { READINESS_TIMEOUT_MS } from './shared/health/health-indicator';
 import { HealthController } from './shared/health/health.controller';
 import { DomainErrorFilter } from './shared/http/domain-error.filter';
 import { AppLogger, createPinoLogger } from './shared/observability/app-logger';
-
-export const APP_CONFIG = Symbol('AppConfig');
+import { PersistenceModule } from './shared/persistence/persistence.module';
 
 /**
  * The composition root. Every dependency is bound here by token, so nothing
@@ -16,6 +16,7 @@ export const APP_CONFIG = Symbol('AppConfig');
  */
 @Global()
 @Module({
+  imports: [PersistenceModule],
   controllers: [HealthController],
   providers: [
     { provide: APP_CONFIG, useFactory: (): AppConfig => loadConfig(process.env) },
@@ -30,8 +31,6 @@ export const APP_CONFIG = Symbol('AppConfig');
         ),
       inject: [APP_CONFIG],
     },
-    // Nothing is a readiness dependency yet; persistence and Redis register here.
-    { provide: HEALTH_INDICATORS, useValue: [] },
     { provide: READINESS_TIMEOUT_MS, useValue: 1_000 },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
   ],

@@ -2,8 +2,9 @@ import type { AppConfig } from '@fca/config';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { APP_CONFIG } from '../app.module';
 import { createApp } from '../create-app';
+import { TEST_ENV } from '../shared/config/__tests__/test-config';
+import { APP_CONFIG } from '../shared/config/app-config.token';
 import { AppLogger } from '../shared/observability/app-logger';
 
 /**
@@ -13,26 +14,13 @@ import { AppLogger } from '../shared/observability/app-logger';
  * `main.ts` does, so a wiring mistake fails here instead of on first deploy.
  */
 
-const ENV: Record<string, string> = {
-  NODE_ENV: 'test',
-  DATABASE_URL: 'postgresql://app_runtime:pw@localhost:5432/financial_chat',
-  MIGRATION_DATABASE_URL: 'postgresql://app:pw@localhost:5432/financial_chat',
-  FINANCIAL_DB_URL: 'postgresql://llm_reader:pw@localhost:5432/financial_chat',
-  REDIS_URL: 'redis://localhost:6379',
-  OPENAI_API_KEY: 'sk-test',
-  USAGE_LIMIT_USD: '1',
-  JWT_SECRET: 'x'.repeat(32),
-  WEB_ORIGIN: 'http://localhost:5173',
-  API_PORT: '3000',
-};
-
 let app: NestFastifyApplication;
 const original = new Map<string, string | undefined>();
 
 beforeAll(async () => {
-  for (const [key, value] of Object.entries(ENV)) {
+  for (const [key, value] of Object.entries(TEST_ENV)) {
     original.set(key, process.env[key]);
-    process.env[key] = value;
+    process.env[key] = value ?? '';
   }
   app = await createApp();
   await app.init();

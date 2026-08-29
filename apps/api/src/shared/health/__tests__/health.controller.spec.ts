@@ -2,20 +2,20 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { AppModule, APP_CONFIG } from '../../../app.module';
+import { AppModule } from '../../../app.module';
 import { createFastifyAdapter } from '../../../bootstrap/fastify';
+import { testConfig } from '../../config/__tests__/test-config';
+import { APP_CONFIG } from '../../config/app-config.token';
 import { AppLogger, createPinoLogger } from '../../observability/app-logger';
 import { HEALTH_INDICATORS, READINESS_TIMEOUT_MS, type HealthIndicator } from '../health-indicator';
 
-const CONFIG = { nodeEnv: 'test', app: { port: 0 } };
-
-let app: NestFastifyApplication;
+let app: NestFastifyApplication | undefined;
 
 /** Boots the real module graph, replacing only what a test needs to control. */
 async function boot(indicators: readonly HealthIndicator[]): Promise<NestFastifyApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(APP_CONFIG)
-    .useValue(CONFIG)
+    .useValue(testConfig())
     .overrideProvider(AppLogger)
     .useValue(new AppLogger(createPinoLogger({ level: 'silent', pretty: false })))
     .overrideProvider(HEALTH_INDICATORS)
@@ -32,11 +32,14 @@ async function boot(indicators: readonly HealthIndicator[]): Promise<NestFastify
   return app;
 }
 
-const get = async (path: string) =>
-  await app.getHttpAdapter().getInstance().inject({ method: 'GET', url: path });
+const get = async (path: string) => {
+  if (app === undefined) throw new Error('boot() was not called');
+  return await app.getHttpAdapter().getInstance().inject({ method: 'GET', url: path });
+};
 
 afterEach(async () => {
-  await app.close();
+  // boot() may have thrown before assigning.
+  await app?.close();
 });
 
 describe('liveness', () => {
