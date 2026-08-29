@@ -20,8 +20,14 @@
       "project": ["src/**/*.ts"]
     },
     "apps/api": {
-      "entry": ["src/main.ts", "src/**/*.spec.ts", "src/__tests__/global-setup.ts"],
-      "project": ["src/**/*.ts"],
+      "entry": [
+        "src/main.ts",
+        "src/**/*.spec.ts",
+        "src/__tests__/global-setup.ts",
+        "worker-threads/*.cjs",
+        "src/**/__tests__/*.cjs"
+      ],
+      "project": ["src/**/*.ts", "worker-threads/*.cjs", "src/**/__tests__/*.cjs"],
       "ignoreDependencies": ["pino-pretty"]
     }
   }

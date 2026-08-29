@@ -103,6 +103,8 @@ module.exports = {
           '[.]config[.](js|cjs|mjs|ts|mts|cts)$',
           '^scripts/', // operator-run entry points, invoked from package.json
           '^apps/[^/]+/src/main[.]ts$', // process entry points
+          '^apps/[^/]+/worker-threads/', // loaded by filename on a thread, never imported
+          '(^|/)__tests__/.*[.]cjs$', // the same, for the workers a test stands up
         ],
       },
       to: {},

@@ -3,6 +3,7 @@ import { Global, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 
 import { APP_CONFIG } from './shared/config/app-config.token';
+import { CpuModule } from './shared/cpu/cpu.module';
 import { HEALTH_INDICATORS, READINESS_TIMEOUT_MS } from './shared/health/health-indicator';
 import { HealthController } from './shared/health/health.controller';
 import { DomainErrorFilter } from './shared/http/domain-error.filter';
@@ -19,7 +20,7 @@ import { RedisService } from './shared/redis/redis.service';
  */
 @Global()
 @Module({
-  imports: [PersistenceModule, RedisModule],
+  imports: [PersistenceModule, RedisModule, CpuModule],
   controllers: [HealthController],
   providers: [
     { provide: APP_CONFIG, useFactory: (): AppConfig => loadConfig(process.env) },

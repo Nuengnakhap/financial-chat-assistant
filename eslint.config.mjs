@@ -130,6 +130,13 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
 
+  {
+    // A worker thread loads its entry by filename with the CommonJS loader, so
+    // `require` is the only thing that works there.
+    files: ['**/*.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+
   // Must stay last: switches off every rule Prettier already decides.
   prettierConfig,
 );
