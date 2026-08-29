@@ -3,6 +3,7 @@ import { asc, inArray, isNull } from 'drizzle-orm';
 
 import type { DatabaseService } from './database.service';
 import { outboxEvents } from './schema';
+import { withTimeout } from '../async/timeouts';
 
 /**
  * Where an outbox event goes once it is safely committed. A port because the
@@ -55,7 +56,11 @@ export class OutboxRelay {
 
       if (rows.length === 0) return 0;
 
-      await withTimeout(this.publisher.publish(rows.map(toPublished)), this.publishTimeoutMs);
+      await withTimeout(
+        this.publisher.publish(rows.map(toPublished)),
+        this.publishTimeoutMs,
+        'publish',
+      );
       await tx
         .update(outboxEvents)
         .set({ publishedAt: new Date() })
@@ -95,20 +100,4 @@ function toPublished(row: typeof outboxEvents.$inferSelect): PublishedEvent {
     payload: row.payload as Readonly<Record<string, JsonValue>>,
   };
   /* eslint-enable @typescript-eslint/consistent-type-assertions */
-}
-
-/** Bounds how long a claim can be held while the broker is unreachable. */
-async function withTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const expiry = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error(`publish timed out after ${String(timeoutMs)}ms`));
-    }, timeoutMs);
-  });
-
-  try {
-    await Promise.race([work, expiry]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
 }

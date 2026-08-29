@@ -1,3 +1,5 @@
+import { withTimeout } from '../async/timeouts';
+
 export interface HealthIndicator {
   readonly name: string;
   check(): Promise<void>;
@@ -27,7 +29,8 @@ export async function checkAll(
   // afterwards, means there is no "unknown indicator" case to handle.
   const outcomes = await Promise.all(
     indicators.map((indicator) =>
-      withTimeout(indicator, timeoutMs).then(
+      // A dependency that never answers is unavailable, not pending.
+      withTimeout(indicator.check(), timeoutMs, 'check').then(
         () => null,
         (reason: unknown): IndicatorFailure => ({ name: indicator.name, reason: describe(reason) }),
       ),
@@ -35,22 +38,6 @@ export async function checkAll(
   );
 
   return outcomes.filter((outcome) => outcome !== null);
-}
-
-/** A dependency that never answers is unavailable, not pending. */
-async function withTimeout(indicator: HealthIndicator, timeoutMs: number): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const expiry = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error(`timed out after ${String(timeoutMs)}ms`));
-    }, timeoutMs);
-  });
-
-  try {
-    await Promise.race([indicator.check(), expiry]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
 }
 
 function describe(reason: unknown): string {
