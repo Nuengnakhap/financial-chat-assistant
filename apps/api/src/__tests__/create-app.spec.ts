@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../create-app';
 import { TEST_ENV } from '../shared/config/__tests__/test-config';
 import { APP_CONFIG } from '../shared/config/app-config.token';
+import { HEALTH_INDICATORS, type HealthIndicator } from '../shared/health/health-indicator';
 import { AppLogger } from '../shared/observability/app-logger';
 
 /**
@@ -67,6 +68,14 @@ describe('the real composition root', () => {
       await production.close();
       process.env['NODE_ENV'] = 'test';
     }
+  });
+
+  it('treats both stores as things readiness depends on', () => {
+    // Nest keeps one provider per token, so two modules each contributing their
+    // own indicator list would leave one of them silently unused.
+    const indicators = app.get<readonly HealthIndicator[]>(HEALTH_INDICATORS);
+
+    expect(indicators.map((indicator) => indicator.name).toSorted()).toEqual(['postgres', 'redis']);
   });
 
   it('answers an unmatched route through the filter bound in the module', async () => {

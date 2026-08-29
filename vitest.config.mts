@@ -32,14 +32,15 @@ export default defineConfig({
       },
       {
         // Needs Docker, so it stays out of `pnpm test` and `pnpm check`; run it
-        // with `pnpm test:integration`. Persistence is tested against a real
-        // PostgreSQL because a fake cannot reject a CHECK constraint.
+        // with `pnpm test:integration`. Persistence runs against a real
+        // PostgreSQL because a fake cannot reject a CHECK constraint, and Redis
+        // against a real server because a fake never forgets a cached script.
         test: {
           name: 'integration',
           root: './apps/api',
           environment: 'node',
           include: ['src/**/*.int.spec.ts'],
-          globalSetup: ['src/shared/persistence/__tests__/global-setup.ts'],
+          globalSetup: ['src/__tests__/global-setup.ts'],
           testTimeout: 60_000,
           hookTimeout: 180_000,
           fileParallelism: false,

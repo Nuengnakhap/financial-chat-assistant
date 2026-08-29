@@ -6,10 +6,10 @@ export interface HealthIndicator {
 }
 
 /**
- * Readiness dependencies, registered by the modules that own them. Empty until
- * a module has something a request genuinely cannot proceed without — the
- * language model is deliberately not one of those, since reading history and
- * signing in keep working while a provider is down.
+ * Readiness dependencies, listed once at the composition root. Two modules
+ * providing this token would silently leave one list unused, and the language
+ * model is deliberately absent: reading history and signing in keep working
+ * while a provider is down.
  */
 export const HEALTH_INDICATORS = Symbol('HealthIndicators');
 
