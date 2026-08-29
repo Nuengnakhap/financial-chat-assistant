@@ -50,10 +50,22 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
 
 ## Stack (pinned — verify against the registry before changing)
 
-Node 24 LTS · TypeScript 7 · NestJS 11 on Fastify · Vite 8 + React 19 ·
+Node 22 · **TypeScript 6.0** · NestJS 11 on Fastify · Vite 8 + React 19 ·
 Drizzle ORM 0.45 + drizzle-kit · PostgreSQL 18 · Redis 8 · zod 4 ·
-openai SDK (OpenAI-compatible via `OPENAI_BASE_URL`) · BullMQ · vitest ·
+openai SDK (OpenAI-compatible via `OPENAI_BASE_URL`) · BullMQ · vitest 4 ·
+ESLint 10 + typescript-eslint 8 · dependency-cruiser 18 · knip 6 ·
 Playwright · testcontainers.
+
+**TypeScript stays on 6.0 deliberately.** TypeScript 7 is the native compiler:
+its package exports only `unstable/*`, not the classic `typescript` API that
+typescript-eslint's type-aware rules are built on, and typescript-eslint declares
+`typescript: >=4.8.4 <6.1.0` accordingly. Moving to 7 would silently remove
+`no-floating-promises`, `switch-exhaustiveness-check` and every other rule that
+needs a type checker. Revisit when typescript-eslint supports 7.
+
+`pnpm-workspace.yaml` sets `minimumReleaseAge` to three days. If a version is
+rejected as too new, widen the range in `package.json` rather than adding an
+exclusion.
 
 Do not upgrade a major version as a side effect of another task.
 
@@ -71,14 +83,18 @@ Do not upgrade a major version as a side effect of another task.
 - CPU-bound work (tokenizer, password hashing) runs on the worker pool, never on
   the event loop.
 - `TODO` must carry an issue reference: `// TODO(#123): ...`
+- Tests go in a `__tests__` directory next to the code they cover, named
+  `<module>.spec.ts`. Never beside the source file.
 
 ## Commands
 
 ```bash
+pnpm check           # format + typecheck + lint + test — run this before saying done
 pnpm infra:up        # Postgres + Redis via Docker Compose
 pnpm db:migrate      # drizzle-kit migrate (uses MIGRATION_DATABASE_URL)
 pnpm db:seed         # load financial_data.sql + grants + indexes
 pnpm dev             # api :3000 + web :5173
+pnpm typecheck       # tsc --noEmit per package, spec files included
 pnpm test            # vitest (unit + integration)
 pnpm test:e2e        # Playwright, scenarios S1–S6
 pnpm eval            # deterministic grounding suite (CI gate)
