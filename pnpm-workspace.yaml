@@ -1,3 +1,13 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# A package published minutes ago is the shape a compromised release arrives in.
+# Nothing enters the tree before a takeover would have been noticed and yanked.
+minimumReleaseAge: 4320 # 3 days, in minutes
+
+# unrs-resolver is the native module behind eslint-import-resolver-typescript.
+# Without its postinstall the resolver cannot load and import rules go quiet
+# instead of failing, so the build is allowed deliberately rather than ignored.
+allowBuilds:
+  unrs-resolver: true

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+*.tsbuildinfo
+
+# Vendored data: nobody reads it line by line.
+data/financial_data.sql
+
+# Fixtures are formatted the way their test needs.
+tools/architecture/fixtures/

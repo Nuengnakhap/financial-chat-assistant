@@ -13,6 +13,36 @@
     "infra:reset": "docker compose -f infra/docker-compose.yml down -v",
     "infra:logs": "docker compose -f infra/docker-compose.yml logs -f",
     "db:seed": "node scripts/seed-financial-data.mjs",
-    "db:verify": "node scripts/verify-data-stack.mjs"
+    "db:verify": "node scripts/verify-data-stack.mjs",
+    "build": "tsc -b",
+    "build:clean": "tsc -b --clean",
+    "typecheck": "tsc -p tools/tsconfig.json --noEmit && pnpm -r --if-present typecheck",
+    "lint": "pnpm lint:code && pnpm lint:deps && pnpm lint:dead",
+    "lint:code": "eslint .",
+    "lint:deps": "depcruise packages tools scripts eslint.config.mjs vitest.config.mts",
+    "lint:dead": "knip",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "dependency-cruiser": "^18.2.0",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
+    "globals": "^17.11.0",
+    "knip": "^6.32.2",
+    "prettier": "^3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.68.0",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }

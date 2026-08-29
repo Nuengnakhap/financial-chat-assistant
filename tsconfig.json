@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // Solution file: no sources of its own; `tsc -b` walks the references.
+  "files": [],
+  "references": [{ "path": "./packages/domain/tsconfig.build.json" }]
+}

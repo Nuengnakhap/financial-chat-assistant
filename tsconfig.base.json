@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // Node 22 is the floor in `engines`; typing above it lets absent APIs typecheck.
+    "target": "ES2023",
+    "lib": ["ES2023"],
+
+    // node16 reads `exports` the way Node does, so what typechecks also resolves.
+    // Emit is CommonJS because apps/api is NestJS.
+    "module": "node16",
+    "moduleResolution": "node16",
+    "moduleDetection": "force",
+
+    // Not relaxable per package.
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedSideEffectImports": true,
+    "useUnknownInCatchVariables": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    // Project references, so `tsc -b` rebuilds only what changed.
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "newLine": "lf"
+  }
+}
