@@ -6,8 +6,8 @@
  * table. Grants are re-applied afterwards because DROP TABLE discards them.
  */
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const composeFile = resolve(repoRoot, 'infra/docker-compose.yml');
@@ -16,12 +16,43 @@ const EXPECTED_ROWS = 192;
 
 /** Runs a SQL file that is mounted inside the container at /seed. */
 function psqlFile(file, label) {
-  run(['exec', '-T', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-q', '-U', 'app', '-d', 'financial_chat', '-f', `/seed/${file}`], label);
+  run(
+    [
+      'exec',
+      '-T',
+      'postgres',
+      'psql',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-q',
+      '-U',
+      'app',
+      '-d',
+      'financial_chat',
+      '-f',
+      `/seed/${file}`,
+    ],
+    label,
+  );
 }
 
 /** Runs a single statement and returns trimmed stdout. */
 function psqlQuery(sql) {
-  const result = compose(['exec', '-T', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-tAq', '-U', 'app', '-d', 'financial_chat', '-c', sql]);
+  const result = compose([
+    'exec',
+    '-T',
+    'postgres',
+    'psql',
+    '-v',
+    'ON_ERROR_STOP=1',
+    '-tAq',
+    '-U',
+    'app',
+    '-d',
+    'financial_chat',
+    '-c',
+    sql,
+  ]);
   if (result.status !== 0) {
     process.stderr.write(result.stderr ?? '');
     throw new Error(`query failed: ${sql}`);

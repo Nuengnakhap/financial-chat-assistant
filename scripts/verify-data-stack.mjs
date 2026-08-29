@@ -11,8 +11,8 @@
  * Exits non-zero on the first failed check.
  */
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const composeFile = resolve(repoRoot, 'infra/docker-compose.yml');
@@ -25,8 +25,19 @@ function compose(args) {
 
 function psql(user, sql) {
   const result = compose([
-    'exec', '-T', 'postgres',
-    'psql', '-v', 'ON_ERROR_STOP=1', '-tAq', '-U', user, '-d', 'financial_chat', '-c', sql,
+    'exec',
+    '-T',
+    'postgres',
+    'psql',
+    '-v',
+    'ON_ERROR_STOP=1',
+    '-tAq',
+    '-U',
+    user,
+    '-d',
+    'financial_chat',
+    '-c',
+    sql,
   ]);
   return {
     ok: result.status === 0,
@@ -41,14 +52,14 @@ function report(name, passed, detail) {
 }
 
 /** A check that must succeed and return an expected value. */
-function expectQuery(name, user, sql, expected) {
+function expectQuery({ name, user, sql, expected }) {
   const { ok, out, err } = psql(user, sql);
   if (!ok) return report(name, false, err.split('\n')[0]);
   report(name, out === expected, `got "${out}", expected "${expected}"`);
 }
 
 /** A check that must fail, with an error message containing `fragment`. */
-function expectDenied(name, user, sql, fragment) {
+function expectDenied({ name, user, sql, fragment }) {
   const { ok, err } = psql(user, sql);
   if (ok) return report(name, false, 'statement unexpectedly succeeded');
   const matched = err.toLowerCase().includes(fragment.toLowerCase());
@@ -56,24 +67,69 @@ function expectDenied(name, user, sql, fragment) {
 }
 
 console.log('Postgres — data:');
-expectQuery('financial_data has 192 rows', 'app', 'SELECT count(*) FROM financial_data;', '192');
+expectQuery({
+  name: 'financial_data has 192 rows',
+  user: 'app',
+  sql: 'SELECT count(*) FROM financial_data;',
+  expected: '192',
+});
 // 49 companies, not the 48 stated in the brief: 47 have four years each, BlackRock
 // and Shopify have two. 47*4 + 2 + 2 = 192.
-expectQuery('49 companies, 2022-2025', 'app', "SELECT count(DISTINCT company) || '/' || min(year) || '-' || max(year) FROM financial_data;", '49/2022-2025');
-expectQuery('indexes created', 'app', "SELECT count(*) FROM pg_indexes WHERE tablename = 'financial_data';", '3');
+expectQuery({
+  name: '49 companies, 2022-2025',
+  user: 'app',
+  sql: "SELECT count(DISTINCT company) || '/' || min(year) || '-' || max(year) FROM financial_data;",
+  expected: '49/2022-2025',
+});
+expectQuery({
+  name: 'indexes created',
+  user: 'app',
+  sql: "SELECT count(*) FROM pg_indexes WHERE tablename = 'financial_data';",
+  expected: '3',
+});
 
 console.log('\nPostgres — llm_reader privileges:');
-expectQuery('can read financial_data', 'llm_reader', 'SELECT count(*) FROM financial_data;', '192');
-expectDenied('cannot INSERT', 'llm_reader', 'INSERT INTO financial_data (company) VALUES (\'x\');', 'read-only transaction');
-expectDenied('cannot UPDATE', 'llm_reader', 'UPDATE financial_data SET revenue = 0;', 'read-only transaction');
-expectDenied('cannot DROP', 'llm_reader', 'DROP TABLE financial_data;', 'read-only transaction');
+expectQuery({
+  name: 'can read financial_data',
+  user: 'llm_reader',
+  sql: 'SELECT count(*) FROM financial_data;',
+  expected: '192',
+});
+expectDenied({
+  name: 'cannot INSERT',
+  user: 'llm_reader',
+  sql: "INSERT INTO financial_data (company) VALUES ('x');",
+  fragment: 'read-only transaction',
+});
+expectDenied({
+  name: 'cannot UPDATE',
+  user: 'llm_reader',
+  sql: 'UPDATE financial_data SET revenue = 0;',
+  fragment: 'read-only transaction',
+});
+expectDenied({
+  name: 'cannot DROP',
+  user: 'llm_reader',
+  sql: 'DROP TABLE financial_data;',
+  fragment: 'read-only transaction',
+});
 
 // A table the role was never granted access to. Created and removed as `app`.
 psql('app', 'CREATE TABLE IF NOT EXISTS privilege_probe (id int);');
-expectDenied('cannot read other tables', 'llm_reader', 'SELECT * FROM privilege_probe;', 'permission denied');
+expectDenied({
+  name: 'cannot read other tables',
+  user: 'llm_reader',
+  sql: 'SELECT * FROM privilege_probe;',
+  fragment: 'permission denied',
+});
 psql('app', 'DROP TABLE IF EXISTS privilege_probe;');
 
-expectDenied('long queries are cut off at 3s', 'llm_reader', 'SELECT pg_sleep(5);', 'statement timeout');
+expectDenied({
+  name: 'long queries are cut off at 3s',
+  user: 'llm_reader',
+  sql: 'SELECT pg_sleep(5);',
+  fragment: 'statement timeout',
+});
 
 console.log('\nRedis:');
 const ping = compose(['exec', '-T', 'redis', 'redis-cli', 'ping']);
