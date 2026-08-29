@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: fca-postgres
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app_password
+      POSTGRES_DB: financial_chat
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18+ images keep data in a version-specific subdirectory, so the
+      # volume mounts at /var/lib/postgresql rather than /var/lib/postgresql/data.
+      - pg_data:/var/lib/postgresql
+      # SQL dump and post-seed scripts, mounted read-only for `psql -f`
+      - ../data:/seed:ro
+      # Runs once on first boot of an empty data volume: creates least-privilege roles
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d financial_chat"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:8-alpine
+    container_name: fca-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      # Budget counters must never be evicted. Cache entries carry a TTL and can
+      # always be rebuilt, so eviction buys us nothing and risks correctness.
+      - --maxmemory-policy
+      - noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pg_data:
+  redis_data:
