@@ -18,6 +18,7 @@ This repository is under active development. What works today:
 | Contracts and configuration (HTTP, SSE, environment)    | Working and verified |
 | API platform (Nest on Fastify, health, errors, logging) | Working and verified |
 | Persistence (schema, constraints, unit of work, outbox) | Working and verified |
+| Runtime (Redis, background tasks, shutdown, CPU pool)   | Working and verified |
 | Application (auth, chat UI, streaming, grounding)       | Not built yet        |
 
 The commands below are the ones that run today. This section will grow as
@@ -159,7 +160,7 @@ streaming and tool calling.
 | `pnpm typecheck`               | `tsc --noEmit` per package, tests included                 |
 | `pnpm lint`                    | ESLint, then dependency-cruiser, then knip                 |
 | `pnpm test`                    | Vitest, unit only — no Docker needed (`test:watch`)        |
-| `pnpm test:integration`        | Persistence against a real PostgreSQL — needs Docker       |
+| `pnpm test:integration`        | Against a real PostgreSQL and Redis — needs Docker         |
 | `pnpm test:coverage`           | Both suites with coverage — needs Docker                   |
 | `pnpm build`                   | Emit `dist/` for every package, in dependency order        |
 | `pnpm --filter @fca/api start` | Run the built API on `API_PORT`                            |
