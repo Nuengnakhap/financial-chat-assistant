@@ -11,10 +11,13 @@ src/
 ├── create-app.ts            builds the app without listening, so tests use the real wiring
 ├── app.module.ts            composition root — every binding by token
 ├── bootstrap/fastify.ts     adapter options, request-id hook
+├── conversation/            first bounded context: ports and their Drizzle adapters
 └── shared/
+    ├── config/              the APP_CONFIG token
     ├── health/              live and ready probes
     ├── http/                response envelope, error filter, request context
-    └── observability/       AppLogger and the bridge NestJS logs through
+    ├── observability/       AppLogger and the bridge NestJS logs through
+    └── persistence/         schema, DatabaseService, UnitOfWork, outbox relay
 ```
 
 Bounded contexts (`identity/`, `conversation/`, `generation/`, `budget/`) land as
@@ -23,7 +26,7 @@ they are built, each split into `domain`, `application`, `infrastructure` and
 another's internals — both enforced by `.dependency-cruiser.cjs`, with fixtures
 in `tools/architecture/` that prove the rules fire.
 
-## Three rules this package exists to hold
+## Four rules this package exists to hold
 
 **Nothing about how the server is built reaches a caller.** `DomainErrorFilter`
 answers with the status a code implies and wording written for a person. Both
@@ -51,6 +54,18 @@ with a timeout — a dependency that never answers is down, not pending. The
 language model is deliberately not a readiness dependency: reading history and
 signing in keep working while a provider is unavailable.
 
+**A change and the news of it are one transaction.** Anything that alters state
+and has to reach somewhere else goes through `UnitOfWork`: repositories and an
+outbox insert commit together, or neither does. Writing the row and then
+enqueueing has a window where a crash leaves a message nobody will ever generate,
+or a job for a message that was rolled back. The relay publishes before it marks,
+so delivery is at-least-once and consumers deduplicate on the event id.
+
+Every invariant the domain states is also a database constraint — `UNIQUE`,
+`CHECK`, a partial unique index — because application code is the layer most
+likely to have the bug. `src/shared/persistence/__tests__/constraints.int.spec.ts`
+watches each one reject what it claims to.
+
 ## Running it
 
 ```bash
@@ -62,7 +77,17 @@ Node does not read a `.env` on its own, so `start` passes
 `--env-file-if-exists`. Fill in the repository's `.env` first: `@fca/config`
 refuses to start on a bad environment and says which variables are wrong.
 
-Tests never open a socket: they build the real app and inject requests through
+## Tests
+
+`pnpm test` never needs Docker. Persistence is different: a fake cannot reject a
+`CHECK` constraint, so those tests run against a real PostgreSQL 18 started by
+testcontainers, in files named `*.int.spec.ts` and run by `pnpm test:integration`.
+They apply the real migration rather than pushing the schema, so what they prove
+is the SQL that will actually run.
+
+`pnpm test:coverage` runs both, and therefore needs Docker.
+
+Unit tests never open a socket: they build the real app and inject requests through
 Fastify, so the adapter, the filter and the providers under test are the ones
 that ship. `src/__tests__/create-app.spec.ts` goes further and boots the graph
 with no overrides at all — every other spec replaces providers to isolate what

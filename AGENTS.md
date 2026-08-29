@@ -91,21 +91,27 @@ Do not upgrade a major version as a side effect of another task.
   the event loop.
 - `TODO` must carry an issue reference: `// TODO(#123): ...`
 - Tests go in a `__tests__` directory next to the code they cover, named
-  `<module>.spec.ts`. Never beside the source file.
+  `<module>.spec.ts`. Never beside the source file. A test that needs a real
+  database is `<module>.int.spec.ts` and runs only under `pnpm test:integration`.
+- Every domain invariant is also a database constraint, and an integration test
+  makes each one fail. A constraint nobody has watched reject something may be
+  misspelled.
 
 ## Commands
 
 ```bash
-pnpm check           # format + typecheck + lint + test — run this before saying done
-pnpm infra:up        # Postgres + Redis via Docker Compose
-pnpm db:migrate      # drizzle-kit migrate (uses MIGRATION_DATABASE_URL)
-pnpm db:seed         # load financial_data.sql + grants + indexes
-pnpm dev             # api :3000 + web :5173
-pnpm typecheck       # tsc --noEmit per package, spec files included
-pnpm test            # vitest (unit + integration)
-pnpm test:e2e        # Playwright, scenarios S1–S6
-pnpm eval            # deterministic grounding suite (CI gate)
-pnpm lint            # eslint + dependency-cruiser + knip
+pnpm check            # build + format + typecheck + lint + test — before saying done
+pnpm infra:up         # Postgres + Redis via Docker Compose
+pnpm db:generate      # write a migration from the schema
+pnpm db:migrate       # apply migrations as the schema owner (MIGRATION_DATABASE_URL)
+pnpm db:seed          # load financial_data.sql + grants + indexes
+pnpm dev              # api :3000 + web :5173
+pnpm typecheck        # tsc --noEmit per package, spec files included
+pnpm test             # vitest, unit only — no Docker needed
+pnpm test:integration # persistence against a real PostgreSQL (needs Docker)
+pnpm test:e2e         # Playwright, scenarios S1–S6
+pnpm eval             # deterministic grounding suite (CI gate)
+pnpm lint             # eslint + dependency-cruiser + knip
 ```
 
 ## Definition of done for a change

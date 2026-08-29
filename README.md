@@ -17,6 +17,7 @@ This repository is under active development. What works today:
 | Domain model (results, errors, ids, money, lifecycles)  | Working and verified |
 | Contracts and configuration (HTTP, SSE, environment)    | Working and verified |
 | API platform (Nest on Fastify, health, errors, logging) | Working and verified |
+| Persistence (schema, constraints, unit of work, outbox) | Working and verified |
 | Application (auth, chat UI, streaming, grounding)       | Not built yet        |
 
 The commands below are the ones that run today. This section will grow as
@@ -36,6 +37,7 @@ cp .env.example .env      # fill in OPENAI_API_KEY when the app needs it
 pnpm infra:up             # PostgreSQL 18 on :5432, Redis 8 on :6379
 pnpm db:seed              # load the financial dataset, grants and indexes
 pnpm db:verify            # prove the stack behaves as designed
+pnpm db:migrate           # create the application tables
 pnpm check                # format, types, lint, boundaries, dead code, tests
 ```
 
@@ -150,11 +152,15 @@ streaming and tool calling.
 | `pnpm infra:logs`              | Follow container logs                                      |
 | `pnpm db:seed`                 | Load the dataset, apply grants, create indexes             |
 | `pnpm db:verify`               | Run the checks shown above                                 |
-| `pnpm check`                   | Everything below, in order — what CI runs                  |
+| `pnpm db:generate`             | Write a migration from the schema                          |
+| `pnpm db:migrate`              | Apply migrations as the schema owner                       |
+| `pnpm check`                   | Build, format, types, lint and unit tests — what CI runs   |
 | `pnpm format`                  | Apply Prettier (`format:check` only reports)               |
 | `pnpm typecheck`               | `tsc --noEmit` per package, tests included                 |
 | `pnpm lint`                    | ESLint, then dependency-cruiser, then knip                 |
-| `pnpm test`                    | Vitest (`test:watch`, `test:coverage`)                     |
+| `pnpm test`                    | Vitest, unit only — no Docker needed (`test:watch`)        |
+| `pnpm test:integration`        | Persistence against a real PostgreSQL — needs Docker       |
+| `pnpm test:coverage`           | Both suites with coverage — needs Docker                   |
 | `pnpm build`                   | Emit `dist/` for every package, in dependency order        |
 | `pnpm --filter @fca/api start` | Run the built API on `API_PORT`                            |
 
