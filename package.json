@@ -1,0 +1,18 @@
+{
+  "name": "financial-chat-assistant",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Chat application answering questions about U.S. public company financials, grounded in SQL query results",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d --wait",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "infra:reset": "docker compose -f infra/docker-compose.yml down -v",
+    "infra:logs": "docker compose -f infra/docker-compose.yml logs -f",
+    "db:seed": "node scripts/seed-financial-data.mjs",
+    "db:verify": "node scripts/verify-data-stack.mjs"
+  }
+}
