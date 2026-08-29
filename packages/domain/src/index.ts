@@ -38,4 +38,21 @@ export {
   type Result,
 } from './result';
 
+export {
+  MESSAGE_STATUSES,
+  canTransitionMessage,
+  isTerminalMessageStatus,
+  transitionMessage,
+  type MessageStatus,
+} from './conversation/message-status.machine';
+export {
+  GENERATION_PHASES,
+  INITIAL_GENERATION_PHASE,
+  TERMINAL_GENERATION_PHASE,
+  canTransitionGeneration,
+  nextGenerationPhases,
+  transitionGeneration,
+  type GenerationOutcome,
+  type GenerationPhase,
+} from './generation/generation-phase.machine';
 export { MicroUsd, type Rounding } from './money/micro-usd.vo';
