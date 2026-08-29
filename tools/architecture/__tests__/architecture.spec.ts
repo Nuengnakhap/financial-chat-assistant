@@ -29,7 +29,14 @@ interface CruiseResult {
  * test here: a net covering less ground than the check it stands in for is worse
  * than none, because it reads as reassurance.
  */
-const LINTED_TARGETS = ['packages', 'tools', 'scripts', 'eslint.config.mjs', 'vitest.config.mts'];
+const LINTED_TARGETS = [
+  'packages',
+  'apps',
+  'tools',
+  'scripts',
+  'eslint.config.mjs',
+  'vitest.config.mts',
+];
 
 function cruise(targets: readonly string[], cwd: string): CruiseResult {
   const result = spawnSync(
@@ -49,7 +56,7 @@ describe('the boundary rules fire on a tree that breaks them', () => {
   let violations: readonly CruiseViolation[];
 
   beforeAll(() => {
-    violations = cruise(['packages'], FIXTURES).summary.violations;
+    violations = cruise(['packages', 'apps'], FIXTURES).summary.violations;
     violated = new Set(violations.map((violation) => violation.rule.name));
   });
 
@@ -83,8 +90,24 @@ describe('the boundary rules fire on a tree that breaks them', () => {
     expect(offending?.from).toBe('packages/domain/misplaced.spec.ts');
   });
 
+  it('catches a business rule depending on the adapter that stores it', () => {
+    expect(violated).toContain('layer-domain-inward');
+
+    const offending = violations.find((v) => v.rule.name === 'layer-domain-inward');
+    expect(offending?.from).toBe('apps/api/src/conversation/domain/entity.ts');
+    expect(offending?.to).toBe('apps/api/src/conversation/infrastructure/repo.ts');
+  });
+
+  it('catches one bounded context reaching into another', () => {
+    expect(violated).toContain('no-cross-context');
+
+    const offending = violations.find((v) => v.rule.name === 'no-cross-context');
+    expect(offending?.from).toBe('apps/api/src/identity/application/login.ts');
+    expect(offending?.to).toBe('apps/api/src/generation/application/start.ts');
+  });
+
   it('reports every violation, not just the first', () => {
-    expect(violated.size).toBeGreaterThanOrEqual(4);
+    expect(violated.size).toBeGreaterThanOrEqual(6);
   });
 });
 

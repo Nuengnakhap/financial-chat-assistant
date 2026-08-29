@@ -102,6 +102,7 @@ module.exports = {
           '^packages/[^/]+/src/index[.]ts$', // package entry points
           '[.]config[.](js|cjs|mjs|ts|mts|cts)$',
           '^scripts/', // operator-run entry points, invoked from package.json
+          '^apps/[^/]+/src/main[.]ts$', // process entry points
         ],
       },
       to: {},
