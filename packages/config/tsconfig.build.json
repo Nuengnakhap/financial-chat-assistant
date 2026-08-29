@@ -1,0 +1,12 @@
+{
+  // Emit path: sources only. Tests never reach dist.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  // The whole tree, not just specs: a helper beside them would be shipped in dist.
+  "exclude": ["src/**/__tests__/**", "src/**/*.spec.ts"]
+}

@@ -1,0 +1,14 @@
+{
+  // Editor, ESLint and `pnpm typecheck`. Covers tests, so type-aware rules reach them.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    // Only the tests touch node: they read `.env.example` to keep it in step
+    // with the schema. Nothing under src/ imports a built-in.
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}
