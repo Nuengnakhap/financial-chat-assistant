@@ -41,6 +41,9 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
   Enforced by dependency-cruiser in CI, not by convention.
 - `packages/domain`, `packages/contracts`, `packages/grounding`, `packages/config`
   are framework-free: no NestJS, Drizzle, pg, ioredis, React imports there.
+- Every HTTP body and SSE event is defined once in `packages/contracts` and
+  imported by both sides. Money crosses the wire as a micro-USD string, never a
+  JSON number. An unknown SSE event is skipped, never fatal.
 - Generation is detached from the HTTP connection: a command creates the message
   and an outbox event; a runner produces events into a Redis Stream; clients
   attach/resume over SSE with `Last-Event-ID`. Disconnect ≠ stop; stopping is an

@@ -15,6 +15,7 @@ This repository is under active development. What works today:
 | Data stack (PostgreSQL, Redis, seed, privilege model)  | Working and verified |
 | Toolchain (types, lint, boundaries, dead code, tests)  | Working and verified |
 | Domain model (results, errors, ids, money, lifecycles) | Working and verified |
+| Contracts and configuration (HTTP, SSE, environment)   | Working and verified |
 | Application (API, chat UI, streaming, grounding)       | Not built yet        |
 
 The commands below are the ones that run today. This section will grow as
@@ -99,12 +100,14 @@ table, or run an expensive query.
 ## Project structure
 
 ```text
-packages/domain/  Framework-free business rules — see its README
-data/             SQL dump, grants and indexes for the financial dataset
-infra/            Docker Compose stack and database bootstrap scripts
-scripts/          Seeding and verification
-tools/            Lint rules and the tests that prove the boundary rules work
-AGENTS.md         Operating rules for AI assistants working in this repository
+packages/domain/     Framework-free business rules — see its README
+packages/contracts/  Every HTTP body and SSE event, shared by API and web
+packages/config/     Environment parsing and typed configuration
+data/                SQL dump, grants and indexes for the financial dataset
+infra/               Docker Compose stack and database bootstrap scripts
+scripts/             Seeding and verification
+tools/               Lint rules and the tests that prove the boundary rules work
+AGENTS.md            Operating rules for AI assistants working in this repository
 ```
 
 `apps/api` and `apps/web` land as development continues.
