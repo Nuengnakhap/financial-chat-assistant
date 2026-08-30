@@ -3,6 +3,8 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    // The local ESLint rules are .mjs with JSDoc types; their spec imports them.
+    "allowJs": true,
     "composite": false,
     "declaration": false,
     "declarationMap": false,

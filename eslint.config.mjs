@@ -6,6 +6,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+import localTokens from './tools/eslint/no-off-token-styles.mjs';
 import local from './tools/eslint/todo-requires-issue.mjs';
 
 /**
@@ -117,7 +118,11 @@ export default tseslint.config(
     files: ['apps/web/**/*.{ts,tsx}'],
     extends: [reactHooks.configs.flat['recommended-latest']],
     languageOptions: { globals: globals.browser },
+    plugins: { 'local-tokens': localTokens },
     rules: {
+      // The design tokens are a closed set; this is what stops a value walking
+      // around them. See apps/web/src/shared/ui/tokens.css.
+      'local-tokens/no-off-token-styles': 'error',
       // The rule that catches a subscription, timer or AbortController with no
       // cleanup, and derived state recomputed in an effect — the two failure
       // modes AGENTS.md names for this package.
