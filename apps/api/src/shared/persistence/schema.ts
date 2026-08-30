@@ -63,6 +63,8 @@ export const sessions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /** Refreshing slides `expires_at` forward; nothing slides past this. */
+    absoluteExpiresAt: timestamp('absolute_expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
   },
   (table) => [
@@ -71,6 +73,11 @@ export const sessions = pgTable(
       .on(table.familyId)
       .where(sql`${table.revokedAt} IS NULL`),
     check('chk_sessions_lifetime', sql`${table.expiresAt} > ${table.createdAt}`),
+    // S4: a session used every day still ends. The cap is a property of the row
+    // rather than something the rotation query has to remember to apply.
+    // Together with chk_sessions_lifetime this also puts the cap after
+    // `created_at`, so saying so again here would add a clause nothing can reach.
+    check('chk_sessions_within_absolute', sql`${table.expiresAt} <= ${table.absoluteExpiresAt}`),
     // Bounded by what `sessionView` in @fca/contracts will render.
     check('chk_sessions_device_length', sql`char_length(${table.device}) between 1 and 200`),
     check('chk_sessions_ip_hash_length', sql`char_length(${table.ipHash}) = 64`),

@@ -273,6 +273,7 @@ const session = (userId: string, familyId = FAMILY) => ({
   device: 'Firefox on macOS',
   ipHash: 'f'.repeat(64),
   expiresAt: new Date(Date.now() + 30 * 86_400_000),
+  absoluteExpiresAt: new Date(Date.now() + 90 * 86_400_000),
 });
 
 async function insertSession(userId: string, familyId = FAMILY): Promise<string> {
@@ -419,6 +420,21 @@ describe('a session is bounded and belongs to a user', () => {
     );
 
     expect(reason).toContain('chk_sessions_ip_hash_length');
+  });
+
+  it('refuses an expiry beyond the absolute cap, on insert and on update alike', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    const beyond = new Date(Date.now() + 200 * 86_400_000);
+
+    const onInsert = await violationOf(() =>
+      h.db.insert(sessions).values({ ...session(userId), expiresAt: beyond }),
+    );
+    await insertSession(userId);
+    // S4 has to hold on the path refreshing actually takes, which is an UPDATE.
+    const onUpdate = await violationOf(() => h.db.update(sessions).set({ expiresAt: beyond }));
+
+    expect(onInsert).toContain('chk_sessions_within_absolute');
+    expect(onUpdate).toContain('chk_sessions_within_absolute');
   });
 
   it('takes its sessions and their tokens with the user', async () => {

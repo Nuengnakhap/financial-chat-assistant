@@ -7,6 +7,8 @@ export interface NewSession {
   readonly device: string;
   readonly ipHash: string;
   readonly expiresAt: Date;
+  /** Refreshing slides `expiresAt` forward; nothing slides past this. */
+  readonly absoluteExpiresAt: Date;
 }
 
 export interface ActiveSession {
@@ -27,18 +29,34 @@ export interface SessionSummary {
 export interface RotationRequest {
   readonly presentedHash: string;
   readonly nextHash: string;
-  /** Refreshing extends the session, so a tab left open overnight still works. */
+  /**
+   * Refreshing extends the session, so a tab left open overnight still works.
+   * Clamped to the session's absolute expiry, which nothing can push past.
+   */
   readonly expiresAt: Date;
+  /**
+   * How recently a token must have been rotated away for a second use of it to
+   * count as two tabs racing rather than a stolen copy. Zero treats every one
+   * as theft.
+   */
+  readonly reuseGraceMs: number;
 }
 
 /**
- * Three answers, not a nullable one: "we have never seen this token" and "this
- * token was rotated away and someone still has a copy" look the same to a
- * caller holding `null`, and one of them has to revoke an entire lineage.
+ * Four answers, not a nullable one. A caller holding `null` cannot tell a token
+ * we never issued from one we rotated away a week ago, and only the second is
+ * grounds for revoking an entire lineage.
  */
 export type RotationOutcome =
   | { readonly kind: 'rotated'; readonly session: ActiveSession }
   | { readonly kind: 'reused'; readonly sessionId: SessionId; readonly familyId: SessionFamilyId }
+  /**
+   * Rotated away moments ago — two tabs refreshing together. This request still
+   * fails, but the lineage survives, because signing someone out of every device
+   * for opening a second tab is a worse outcome than the one it guards against:
+   * a thief replaying inside the window gets no token either way.
+   */
+  | { readonly kind: 'raced'; readonly sessionId: SessionId }
   | { readonly kind: 'unknown' };
 
 export interface SessionRepository {

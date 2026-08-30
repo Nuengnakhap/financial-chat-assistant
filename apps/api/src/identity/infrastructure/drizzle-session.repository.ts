@@ -16,16 +16,18 @@ import type {
  * `execute` hands back whatever the database called the columns, so these are
  * snake_case. The index signature is what `execute` requires of a row type.
  *
- * No timestamp is selected here on purpose: raw `execute` skips the mapping the
- * query builder does, so a `timestamptz` arrives as the text PostgreSQL prints
- * rather than a `Date`, and every expiry these statements would return is one
- * the caller just supplied.
+ * No `timestamptz` is selected here on purpose: raw `execute` skips the mapping
+ * the query builder does, so one arrives as the text PostgreSQL prints rather
+ * than a `Date`. Where a time really has to come back — the expiry after the
+ * absolute cap has been applied to it — it is selected as epoch milliseconds in
+ * a `float8`, which the driver does turn into a number.
  */
 interface SessionColumns {
   readonly [column: string]: unknown;
   readonly id: string;
   readonly user_id: string;
   readonly family_id: string;
+  readonly expires_at_ms: number;
 }
 
 interface PresentedTokenColumns {
@@ -33,6 +35,7 @@ interface PresentedTokenColumns {
   readonly session_id: string;
   readonly family_id: string;
   readonly reused: boolean;
+  readonly within_grace: boolean;
 }
 
 export class DrizzleSessionRepository implements SessionRepository {
@@ -46,21 +49,25 @@ export class DrizzleSessionRepository implements SessionRepository {
   async create(scope: OwnerScope, session: NewSession): Promise<ActiveSession> {
     const result = await this.db.execute<SessionColumns>(sql`
       WITH created AS (
-        INSERT INTO ${sessions} (user_id, family_id, device, ip_hash, expires_at)
-        VALUES (${scope.userId}, ${session.familyId}, ${session.device},
-                ${session.ipHash}, ${session.expiresAt})
-        RETURNING id, user_id, family_id
+        INSERT INTO ${sessions}
+               (user_id, family_id, device, ip_hash, expires_at, absolute_expires_at)
+        VALUES (${scope.userId}, ${session.familyId}, ${session.device}, ${session.ipHash},
+                LEAST(${session.expiresAt}::timestamptz, ${session.absoluteExpiresAt}::timestamptz),
+                ${session.absoluteExpiresAt})
+        RETURNING id, user_id, family_id, expires_at
       ), issued AS (
         INSERT INTO ${sessionTokens} (hash, session_id)
         SELECT ${session.tokenHash}, id FROM created
       )
-      SELECT id, user_id, family_id FROM created
+      SELECT id, user_id, family_id,
+             EXTRACT(EPOCH FROM expires_at)::float8 * 1000 AS expires_at_ms
+        FROM created
     `);
 
     const row = result.rows[0];
     if (row === undefined) throw new Error('session insert returned no row');
 
-    return toActive(row, session.expiresAt);
+    return toActive(row);
   }
 
   async rotate(request: RotationRequest, now: Date): Promise<RotationOutcome> {
@@ -69,7 +76,7 @@ export class DrizzleSessionRepository implements SessionRepository {
 
     // Nothing moved. Either the token is unknown, or it is one we issued and
     // have already rotated away — which is the signal a copy of it exists.
-    return await this.diagnose(request.presentedHash);
+    return await this.diagnose(request, now);
   }
 
   /**
@@ -87,6 +94,9 @@ export class DrizzleSessionRepository implements SessionRepository {
         UPDATE ${sessionTokens} AS t SET superseded_at = ${now}
           FROM ${sessions} AS s
          WHERE t.hash = ${request.presentedHash} AND t.superseded_at IS NULL
+           -- No separate check on absolute_expires_at: the clamp below plus
+           -- chk_sessions_within_absolute keep expires_at at or under it, so a
+           -- session past its cap is already past this.
            AND s.id = t.session_id AND s.revoked_at IS NULL AND s.expires_at > ${now}
         RETURNING t.session_id
       ), issued AS (
@@ -94,20 +104,27 @@ export class DrizzleSessionRepository implements SessionRepository {
         SELECT ${request.nextHash}, session_id, ${now} FROM superseded
         RETURNING session_id
       )
-      UPDATE ${sessions} SET last_used_at = ${now}, expires_at = ${request.expiresAt}
+      UPDATE ${sessions} SET last_used_at = ${now},
+             -- The cap is applied here rather than trusted to the caller, and
+             -- chk_sessions_within_absolute rejects the statement if it is not.
+             expires_at = LEAST(${request.expiresAt}::timestamptz, absolute_expires_at)
        WHERE id IN (SELECT session_id FROM issued)
-      RETURNING id, user_id, family_id
+      RETURNING id, user_id, family_id,
+                EXTRACT(EPOCH FROM expires_at)::float8 * 1000 AS expires_at_ms
     `);
 
     const row = result.rows[0];
-    return row === undefined ? null : toActive(row, request.expiresAt);
+    return row === undefined ? null : toActive(row);
   }
 
-  private async diagnose(presentedHash: string): Promise<RotationOutcome> {
+  private async diagnose(request: RotationRequest, now: Date): Promise<RotationOutcome> {
+    const graceStart = new Date(now.getTime() - request.reuseGraceMs);
     const result = await this.db.execute<PresentedTokenColumns>(sql`
-      SELECT t.session_id, s.family_id, (t.superseded_at IS NOT NULL) AS reused
+      SELECT t.session_id, s.family_id,
+             (t.superseded_at IS NOT NULL) AS reused,
+             (t.superseded_at > ${graceStart}) AS within_grace
         FROM ${sessionTokens} AS t JOIN ${sessions} AS s ON s.id = t.session_id
-       WHERE t.hash = ${presentedHash}
+       WHERE t.hash = ${request.presentedHash}
     `);
 
     const row = result.rows[0];
@@ -118,9 +135,12 @@ export class DrizzleSessionRepository implements SessionRepository {
 
     /* eslint-disable @typescript-eslint/consistent-type-assertions --
        the row came from our own database, so the ids are known-good. */
+    const sessionId = row.session_id as SessionId;
+    if (row.within_grace) return { kind: 'raced', sessionId };
+
     return {
       kind: 'reused',
-      sessionId: row.session_id as SessionId,
+      sessionId,
       familyId: row.family_id as SessionFamilyId,
     };
     /* eslint-enable @typescript-eslint/consistent-type-assertions */
@@ -178,14 +198,16 @@ export class DrizzleSessionRepository implements SessionRepository {
   }
 }
 
-function toActive(row: SessionColumns, expiresAt: Date): ActiveSession {
+function toActive(row: SessionColumns): ActiveSession {
   /* eslint-disable @typescript-eslint/consistent-type-assertions --
      the only place a raw column becomes a branded id; the row is our own. */
   return {
     id: row.id as SessionId,
     userId: row.user_id as UserId,
     familyId: row.family_id as SessionFamilyId,
-    expiresAt,
+    // What the row holds after the cap was applied, which is not always what
+    // the caller asked for.
+    expiresAt: new Date(row.expires_at_ms),
   };
   /* eslint-enable @typescript-eslint/consistent-type-assertions */
 }
