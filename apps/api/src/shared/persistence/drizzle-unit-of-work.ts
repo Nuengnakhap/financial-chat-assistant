@@ -6,6 +6,7 @@ import { outboxEvents } from './schema';
 import type { TxContext, UnitOfWork } from './unit-of-work';
 import { DrizzleConversationRepository } from '../../conversation/infrastructure/drizzle-conversation.repository';
 import { DrizzleMessageRepository } from '../../conversation/infrastructure/drizzle-message.repository';
+import { DrizzleSessionRepository } from '../../identity/infrastructure/drizzle-session.repository';
 
 @Injectable()
 export class DrizzleUnitOfWork implements UnitOfWork {
@@ -18,6 +19,7 @@ export class DrizzleUnitOfWork implements UnitOfWork {
         const result = await work({
           conversations: new DrizzleConversationRepository(tx),
           messages: new DrizzleMessageRepository(tx),
+          sessions: new DrizzleSessionRepository(tx),
           publish: (event) => pending.push(event),
         });
 

@@ -2,6 +2,7 @@ import type { DomainEvent } from '@fca/domain';
 
 import type { ConversationRepository } from '../../conversation/application/ports/conversation.repository';
 import type { MessageRepository } from '../../conversation/application/ports/message.repository';
+import type { SessionRepository } from '../../identity/application/ports/session.repository';
 
 /**
  * The single transaction boundary. A use case that changes state and has to tell
@@ -12,6 +13,7 @@ import type { MessageRepository } from '../../conversation/application/ports/mes
 export interface TxContext {
   readonly conversations: ConversationRepository;
   readonly messages: MessageRepository;
+  readonly sessions: SessionRepository;
   /** Buffered, then written to the outbox inside the same transaction. */
   publish(event: DomainEvent): void;
 }
