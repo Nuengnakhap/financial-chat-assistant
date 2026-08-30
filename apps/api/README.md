@@ -84,7 +84,28 @@ primary key: with a current and a previous column, the same hash could be the
 live one on one row and the retired one on another, and the query that detects a
 stolen token would get two answers with nothing to choose between them.
 Superseded rows are kept, because presenting one is the evidence that a copy of
-it exists.
+it exists — except in the seconds right after a rotation, where it is more likely
+two tabs refreshing together. That request fails either way; only outside the
+window does the whole lineage get revoked, and `REFRESH_REUSE_GRACE_SECONDS=0`
+removes the exception. Refreshing also slides the session's expiry forward, but
+never past `absolute_expires_at`, which a `CHECK` holds rather than the query.
+
+Signing in answers the same sentence whether the address is unknown or the
+password is wrong, and pays for a full argon2 verification either way — against
+a stand-in hash carrying the same cost parameters when nobody matched, because
+an early return is what makes the two distinguishable by a stopwatch. Attempts
+are counted in a Redis sorted set before the account is even looked up, per
+address and per caller separately, so one account cannot be ground down from
+many hosts and one host cannot walk a list of addresses. The trim, the count and
+the insert are one Lua script: run as three commands, two callers both read a
+count of four and both become the fifth.
+
+Registering is counted too, on a key of its own. It answers the same question
+signing in answers — whether an address is taken — and it is the only
+unauthenticated path that spends an argon2 hash, so leaving it open would make
+the limit on the other door decorative. It is counted **per host only**:
+counting it per address would hand anyone a way to lock a known account out of
+signing in by registering its email over and over.
 
 **Stopping is a sequence, not an event.** On `SIGTERM` or `SIGINT`, readiness is
 refused first and the process keeps serving for a grace period, so traffic has
