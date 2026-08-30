@@ -1,3 +1,4 @@
+import fastifyCookie from '@fastify/cookie';
 import { NestFactory } from '@nestjs/core';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 
@@ -16,6 +17,9 @@ export async function createApp(): Promise<NestFastifyApplication> {
     bufferLogs: true,
   });
 
+  // Cookies are how every credential travels, so the parser is part of building
+  // the app rather than something a controller remembers to ask for.
+  await app.register(fastifyCookie);
   app.useLogger(new NestLoggerBridge(app.get(AppLogger)));
   // No `enableShutdownHooks()`: it installs its own signal handlers that call
   // `close()` straight away, racing the ordered sequence in `main.ts`.

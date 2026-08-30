@@ -39,6 +39,12 @@ export class DrizzleUserRepository implements UserRepository {
     return row === undefined ? null : toStored(row);
   }
 
+  async findById(id: UserId): Promise<StoredUser | null> {
+    const [row] = await this.db.select(VIEW).from(users).where(eq(users.id, id)).limit(1);
+
+    return row === undefined ? null : toStored(row);
+  }
+
   async findCredentialsByEmail(email: string): Promise<Credentials | null> {
     // Matched the way `uq_users_email` is built, so the lookup uses the index
     // and two people cannot register the same address in different cases.

@@ -1,7 +1,7 @@
 import type { AppConfig } from '@fca/config';
 import { isErr, isOk, RateLimitedError } from '@fca/domain';
 import { Redis } from 'ioredis';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { testConfig } from '../../../shared/config/__tests__/test-config';
 import { AppLogger, createPinoLogger } from '../../../shared/observability/app-logger';
@@ -32,7 +32,7 @@ beforeAll(() => {
   redis = new RedisService(config, silent);
   admin = new Redis(url());
 });
-afterEach(async () => {
+beforeEach(async () => {
   await admin.flushall();
 });
 afterAll(async () => {

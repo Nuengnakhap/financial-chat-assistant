@@ -64,6 +64,7 @@ export const fakeSessions = (overrides: Partial<SessionRepository> = {}): Sessio
 });
 
 export const fakeUsers = (overrides: Partial<UserRepository> = {}): UserRepository => ({
+  findById: unimplemented('users.findById'),
   create: unimplemented('users.create'),
   findCredentialsByEmail: unimplemented('users.findCredentialsByEmail'),
   ...overrides,

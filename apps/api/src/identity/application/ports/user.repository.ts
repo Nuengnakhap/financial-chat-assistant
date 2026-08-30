@@ -20,6 +20,8 @@ export interface Credentials {
 }
 
 export interface UserRepository {
+  findById(id: UserId): Promise<StoredUser | null>;
+
   /** `null` when the address is already taken, decided by the database, not a prior read. */
   create(user: NewUser): Promise<StoredUser | null>;
 
