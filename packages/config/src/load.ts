@@ -32,6 +32,7 @@ export interface AppConfig {
     readonly refreshTokenTtlDays: number;
     readonly sessionAbsoluteTtlDays: number;
     readonly refreshReuseGraceMs: number;
+    readonly sessionRetentionDays: number;
     readonly cookieSecure: boolean;
     readonly throttle: {
       readonly windowMs: number;
@@ -98,6 +99,7 @@ function toAppConfig(env: Env): AppConfig {
       refreshTokenTtlDays: env.REFRESH_TOKEN_TTL_DAYS,
       sessionAbsoluteTtlDays: env.SESSION_ABSOLUTE_TTL_DAYS,
       refreshReuseGraceMs: env.REFRESH_REUSE_GRACE_SECONDS * 1_000,
+      sessionRetentionDays: env.SESSION_RETENTION_DAYS,
       cookieSecure: env.COOKIE_SECURE,
       throttle: {
         windowMs: env.AUTH_THROTTLE_WINDOW_SECONDS * 1_000,

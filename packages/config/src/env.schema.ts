@@ -86,6 +86,13 @@ export const envSchema = z.object({
    */
   REFRESH_REUSE_GRACE_SECONDS: wholeNumber(0, 300).default(10),
 
+  /**
+   * How long a session that can no longer be used is kept in the database. It
+   * is already hidden from every listing the moment it dies; this is only about
+   * how long the row survives for anyone reconstructing what happened.
+   */
+  SESSION_RETENTION_DAYS: wholeNumber(1, 3_650).default(30),
+
   AUTH_THROTTLE_WINDOW_SECONDS: wholeNumber(1, 3_600).default(300),
   /** An address is guessed far less often than a host is shared, hence two numbers. */
   AUTH_THROTTLE_PER_EMAIL: wholeNumber(1, 1_000).default(5),

@@ -37,6 +37,7 @@ describe('a valid environment', () => {
     expect(config.auth.refreshTokenTtlDays).toBe(30);
     expect(config.auth.sessionAbsoluteTtlDays).toBe(90);
     expect(config.auth.refreshReuseGraceMs).toBe(10_000);
+    expect(config.auth.sessionRetentionDays).toBe(30);
     expect(config.auth.throttle).toEqual({
       windowMs: 300_000,
       perEmail: 5,
