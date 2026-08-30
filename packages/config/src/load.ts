@@ -4,7 +4,6 @@ export interface AppConfig {
   readonly nodeEnv: Env['NODE_ENV'];
   readonly app: {
     readonly port: number;
-    readonly webOrigin: string;
     readonly otlpEndpoint: string | null;
   };
   readonly database: {
@@ -76,7 +75,6 @@ function toAppConfig(env: Env): AppConfig {
     nodeEnv: env.NODE_ENV,
     app: {
       port: env.API_PORT,
-      webOrigin: env.WEB_ORIGIN,
       otlpEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT,
     },
     database: {

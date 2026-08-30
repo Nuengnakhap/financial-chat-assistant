@@ -11,7 +11,6 @@ const VALID: EnvSource = {
   OPENAI_API_KEY: 'sk-test',
   USAGE_LIMIT_USD: '1',
   JWT_SECRET: 'x'.repeat(32),
-  WEB_ORIGIN: 'http://localhost:5173',
 };
 
 const withEnv = (overrides: EnvSource): EnvSource => ({ ...VALID, ...overrides });
@@ -133,14 +132,14 @@ describe('an invalid environment', () => {
   it('reports every problem at once, not one per restart', () => {
     let issues: readonly string[] = [];
     try {
-      loadConfig({ ...VALID, DATABASE_URL: 'nope', REDIS_URL: 'nope', WEB_ORIGIN: 'nope' });
+      loadConfig({ ...VALID, DATABASE_URL: 'nope', REDIS_URL: 'nope', OPENAI_BASE_URL: 'nope' });
     } catch (error) {
       if (error instanceof ConfigError) issues = error.issues;
     }
 
     expect(issues).toHaveLength(3);
     expect(issues.join('\n')).toContain('DATABASE_URL');
-    expect(issues.join('\n')).toContain('WEB_ORIGIN');
+    expect(issues.join('\n')).toContain('OPENAI_BASE_URL');
   });
 
   it('names a missing variable instead of failing later at the driver', () => {
@@ -165,16 +164,16 @@ describe('secret handling', () => {
   };
 
   it('never puts a secret value in the error message', () => {
-    // Every secret is present but WEB_ORIGIN is broken, so the whole parse fails
+    // Every secret is present but OPENAI_BASE_URL is broken, so the whole parse fails
     // with the secrets in hand — the moment a naive implementation echoes them.
     let message = '';
     try {
-      loadConfig({ ...VALID, ...secrets, WEB_ORIGIN: 'not-a-url' });
+      loadConfig({ ...VALID, ...secrets, OPENAI_BASE_URL: 'not-a-url' });
     } catch (error) {
       message = error instanceof Error ? error.message : String(error);
     }
 
-    expect(message).toContain('WEB_ORIGIN');
+    expect(message).toContain('OPENAI_BASE_URL');
     for (const value of Object.values(secrets)) {
       expect(message).not.toContain(value);
     }

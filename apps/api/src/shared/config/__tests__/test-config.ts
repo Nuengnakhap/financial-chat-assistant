@@ -14,7 +14,6 @@ export const TEST_ENV: EnvSource = {
   OPENAI_API_KEY: 'sk-test',
   USAGE_LIMIT_USD: '1',
   JWT_SECRET: 'x'.repeat(32),
-  WEB_ORIGIN: 'http://localhost:5173',
   API_PORT: '3000',
 };
 

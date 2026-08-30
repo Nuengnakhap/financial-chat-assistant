@@ -105,7 +105,6 @@ export const envSchema = z.object({
   COOKIE_SECURE: z.stringbool().default(false),
 
   API_PORT: wholeNumber(1, 65_535).default(3_000),
-  WEB_ORIGIN: z.url(),
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl.default(null),
 });
 
