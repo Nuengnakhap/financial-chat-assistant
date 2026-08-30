@@ -106,8 +106,26 @@ describe('the boundary rules fire on a tree that breaks them', () => {
     expect(offending?.to).toBe('apps/api/src/generation/application/start.ts');
   });
 
+  it('catches a shared module in the web client reaching up into a feature', () => {
+    expect(violated).toContain('web-layer-shared-inward');
+
+    const offending = violations.find((v) => v.rule.name === 'web-layer-shared-inward');
+    expect(offending?.from).toBe('apps/web/src/shared/Panel.tsx');
+    // A .tsx that resolves is the point: without the extension in the resolver
+    // this dependency is invisible and the rule silently passes.
+    expect(offending?.to).toBe('apps/web/src/features/composer/Composer.tsx');
+  });
+
+  it('catches one slice of the web client importing a sibling slice', () => {
+    expect(violated).toContain('web-no-cross-slice');
+
+    const offending = violations.find((v) => v.rule.name === 'web-no-cross-slice');
+    expect(offending?.from).toBe('apps/web/src/entities/session/model.ts');
+    expect(offending?.to).toBe('apps/web/src/entities/user/model.ts');
+  });
+
   it('reports every violation, not just the first', () => {
-    expect(violated.size).toBeGreaterThanOrEqual(6);
+    expect(violated.size).toBeGreaterThanOrEqual(8);
   });
 });
 

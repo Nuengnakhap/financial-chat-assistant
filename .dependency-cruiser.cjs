@@ -21,7 +21,16 @@ const FRAMEWORKS = [
   'openai',
 ];
 
-const TEST_CODE = '[.](spec|test)[.]ts$|(^|/)__tests__/';
+const TEST_CODE = '[.](spec|test)[.]tsx?$|(^|/)__tests__/';
+
+/**
+ * apps/web is feature-sliced: shared → entities → features/widgets → pages → app.
+ * Listed outermost first so a slice may only name the ones after it.
+ */
+const WEB_LAYERS = ['app', 'pages', 'widgets', 'features', 'entities', 'shared'];
+
+/** Everything a layer sits below, as an alternation for a path pattern. */
+const above = (layer) => WEB_LAYERS.slice(0, WEB_LAYERS.indexOf(layer)).join('|');
 
 /**
  * Matches a module resolved into node_modules and one that is not installed at all —
@@ -79,6 +88,25 @@ module.exports = {
         pathNot: '^apps/api/src/$1/',
       },
     },
+    ...WEB_LAYERS.slice(1).map((layer) => ({
+      name: `web-layer-${layer}-inward`,
+      severity: 'error',
+      comment:
+        `apps/web/src/${layer} may not import from a layer above it. Feature-sliced layers ` +
+        'only mean anything while the arrows point one way; the first upward import turns ' +
+        'the whole tree back into a folder listing.',
+      from: { path: `^apps/web/src/${layer}/` },
+      to: { path: `^apps/web/src/(${above(layer)})/` },
+    })),
+    {
+      name: 'web-no-cross-slice',
+      severity: 'error',
+      comment:
+        'Two slices in the same layer are siblings, not dependencies. Whatever both need ' +
+        'belongs in shared; importing across makes one impossible to delete.',
+      from: { path: '^apps/web/src/(entities|features|widgets|pages)/([^/]+)/' },
+      to: { path: '^apps/web/src/$1/', pathNot: '^apps/web/src/$1/$2/' },
+    },
     {
       name: 'no-circular',
       severity: 'error',
@@ -127,7 +155,7 @@ module.exports = {
       name: 'tests-live-in-tests-folder',
       severity: 'error',
       comment: 'Spec files belong in a __tests__ directory beside the code they cover.',
-      from: { path: '[.](spec|test)[.]ts$', pathNot: '(^|/)__tests__/' },
+      from: { path: '[.](spec|test)[.]tsx?$', pathNot: '(^|/)__tests__/' },
       to: {},
     },
   ],
@@ -141,8 +169,11 @@ module.exports = {
     tsConfig: { fileName: 'tsconfig.base.json' },
     enhancedResolveOptions: {
       exportsFields: ['exports'],
-      conditionNames: ['require', 'node', 'types', 'default'],
-      extensions: ['.ts', '.js', '.mjs', '.cjs', '.json'],
+      conditionNames: ['require', 'import', 'browser', 'node', 'types', 'default'],
+      // Without .tsx an import between two components resolves to nothing, and a
+      // rule whose `to` never matches reports success. Measured on a fixture that
+      // breaks a layer rule: unresolved before adding it, caught after.
+      extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json'],
     },
     reporterOptions: {
       text: { highlightFocused: true },
