@@ -8,6 +8,7 @@ import { Redis } from 'ioredis';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createFastifyAdapter } from '../../../bootstrap/fastify';
+import { TaskRegistry } from '../../../bootstrap/task-registry';
 import { testConfig } from '../../../shared/config/__tests__/test-config';
 import { APP_CONFIG } from '../../../shared/config/app-config.token';
 import { DomainErrorFilter } from '../../../shared/http/domain-error.filter';
@@ -45,8 +46,10 @@ function integrationConfig(): AppConfig {
       useValue: new AppLogger(createPinoLogger({ level: 'silent', pretty: false })),
     },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
+    // The janitor registers here; without it the module cannot be built at all.
+    TaskRegistry,
   ],
-  exports: [APP_CONFIG, AppLogger],
+  exports: [APP_CONFIG, AppLogger, TaskRegistry],
 })
 class AuthFlowModule {}
 
@@ -73,6 +76,8 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  // Stops the janitor before the pool it sweeps through is closed under it.
+  await app.get(TaskRegistry).drain(1_000);
   await app.close();
   await redis.quit();
   await harness.close();
@@ -112,7 +117,7 @@ class Jar {
 }
 
 interface Call {
-  readonly method: 'GET' | 'POST';
+  readonly method: 'GET' | 'POST' | 'DELETE';
   readonly url: string;
   readonly payload?: Payload;
   readonly jar?: Jar;
@@ -253,5 +258,144 @@ describe('a session from end to end', () => {
 
     // The caller comes from the token, so there is no parameter to tamper with.
     expect(mine.json()).toMatchObject({ user: { email: 'grace@example.com' } });
+  });
+});
+
+describe('the isolation gate', () => {
+  interface ListedSessions {
+    readonly sessions: readonly { readonly id: string; readonly current: boolean }[];
+  }
+
+  /** `json()` is generic, so the shape is named once here rather than at each use. */
+  const sessionsOf = (response: LightMyRequestResponse): ListedSessions['sessions'] =>
+    response.json<ListedSessions>().sessions;
+
+  const idsOf = (response: LightMyRequestResponse) => sessionsOf(response).map((s) => s.id);
+
+  it('lists only the caller own sessions, marking the one in hand', async () => {
+    const ada = new Jar();
+    await signUp(ada);
+    const second = new Jar();
+    await call({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { email: CREDENTIALS.email, password: CREDENTIALS.password },
+      jar: second,
+    });
+    const grace = new Jar();
+    await signUp(grace, { email: 'grace@example.com', displayName: 'Grace' });
+
+    const mine = await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: ada });
+    const theirs = await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: grace });
+
+    expect(idsOf(mine)).toHaveLength(2);
+    expect(idsOf(theirs)).toHaveLength(1);
+    // Two devices, exactly one of them the request arrived on.
+    const flags = sessionsOf(mine).map((s) => s.current);
+    expect(flags.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('shows another user nothing of yours, not even that it exists', async () => {
+    const ada = new Jar();
+    await signUp(ada);
+    const [target] = idsOf(await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: ada }));
+    const grace = new Jar();
+    await signUp(grace, { email: 'grace@example.com', displayName: 'Grace' });
+
+    const stolen = await call({
+      method: 'DELETE',
+      url: `/api/v1/auth/sessions/${String(target)}`,
+      jar: grace,
+    });
+
+    // 404 rather than 403: a 403 would confirm the id names something real.
+    expect(stolen.statusCode).toBe(404);
+    expect((await call({ method: 'GET', url: '/api/v1/auth/me', jar: ada })).statusCode).toBe(200);
+  });
+
+  it.each([
+    ['an id that names nothing', '3f2504e0-4f89-41d3-9a0c-0305e82c3399'],
+    ['an id that is not a uuid', 'not-a-uuid'],
+  ])('answers not-found for %s, in the same words', async (_name, id) => {
+    const ada = new Jar();
+    await signUp(ada);
+
+    const response = await call({
+      method: 'DELETE',
+      url: `/api/v1/auth/sessions/${id}`,
+      jar: ada,
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ code: 'not_found' });
+  });
+
+  it('ends another device of your own, and only that one', async () => {
+    const first = new Jar();
+    await signUp(first);
+    const second = new Jar();
+    await call({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { email: CREDENTIALS.email, password: CREDENTIALS.password },
+      jar: second,
+    });
+
+    const listed = sessionsOf(
+      await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: second }),
+    );
+    const other = listed.find((s) => !s.current);
+
+    const revoked = await call({
+      method: 'DELETE',
+      url: `/api/v1/auth/sessions/${String(other?.id)}`,
+      jar: second,
+    });
+
+    expect(revoked.statusCode).toBe(200);
+    expect(idsOf(await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: second }))).toEqual(
+      [String(listed.find((s) => s.current)?.id)],
+    );
+    // The revoked device can no longer refresh, which is what revoking means.
+    expect(
+      (await call({ method: 'POST', url: '/api/v1/auth/refresh', jar: first })).statusCode,
+    ).toBe(401);
+  });
+
+  it('clears the cookies when you end the session you are asking from', async () => {
+    const jar = new Jar();
+    await signUp(jar);
+    const [mine] = sessionsOf(
+      await call({ method: 'GET', url: '/api/v1/auth/sessions', jar }),
+    ).filter((s) => s.current);
+
+    const response = await call({
+      method: 'DELETE',
+      url: `/api/v1/auth/sessions/${String(mine?.id)}`,
+      jar,
+    });
+
+    expect(response.statusCode).toBe(200);
+    // Ending your own session is signing out, so it has to end the same way —
+    // otherwise the browser keeps presenting credentials for a session that is
+    // gone until they expire on their own.
+    expect((await call({ method: 'GET', url: '/api/v1/auth/me', jar })).statusCode).toBe(401);
+  });
+
+  it('refuses the whole surface to a caller with no session', async () => {
+    const anonymous = new Jar();
+
+    expect(
+      (await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: anonymous })).statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await call({
+          method: 'DELETE',
+          url: '/api/v1/auth/sessions/3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+          jar: anonymous,
+        })
+      ).statusCode,
+    ).toBe(401);
   });
 });

@@ -60,6 +60,7 @@ export const fakeSessions = (overrides: Partial<SessionRepository> = {}): Sessio
   listForOwner: unimplemented('sessions.listForOwner'),
   revoke: unimplemented('sessions.revoke'),
   revokeFamily: unimplemented('sessions.revokeFamily'),
+  deleteDeadBefore: unimplemented('sessions.deleteDeadBefore'),
   ...overrides,
 });
 

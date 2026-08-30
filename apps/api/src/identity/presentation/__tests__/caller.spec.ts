@@ -4,12 +4,15 @@ import type { FastifyRequest } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
 import type { DescribeUserUseCase } from '../../application/use-cases/describe-user.use-case';
+import type { ListSessionsUseCase } from '../../application/use-cases/list-sessions.use-case';
+import type { RevokeSessionUseCase } from '../../application/use-cases/revoke-session.use-case';
 import type { RotateRefreshTokenUseCase } from '../../application/use-cases/rotate-refresh-token.use-case';
 import type { SignOutUseCase } from '../../application/use-cases/sign-out.use-case';
 import { callerFrom } from '../caller';
 import { CurrentUserController } from '../current-user.controller';
 import type { SessionCookies } from '../session-cookies';
 import { SessionController } from '../session.controller';
+import { SessionsController } from '../sessions.controller';
 
 const request = (headers: Record<string, string | undefined>, ip = '203.0.113.7') =>
   ({ headers, ip }) as unknown as FastifyRequest;
@@ -53,6 +56,13 @@ describe('describing the caller', () => {
   });
 });
 
+const sessionsController = () =>
+  new SessionsController(
+    { set: () => undefined, clear: () => undefined } as unknown as SessionCookies,
+    { execute: () => Promise.resolve([]) } as unknown as ListSessionsUseCase,
+    { execute: () => Promise.resolve(null) } as unknown as RevokeSessionUseCase,
+  );
+
 describe('a handler that runs without a guard', () => {
   it.each([
     [
@@ -70,6 +80,14 @@ describe('a handler that runs without a guard', () => {
           { execute: () => Promise.resolve(null) } as unknown as RotateRefreshTokenUseCase,
           { execute: () => Promise.resolve(null) } as unknown as SignOutUseCase,
         ).logout({ clearCookie: () => undefined } as never),
+    ],
+    ['listing sessions', async () => await sessionsController().listSessions()],
+    [
+      'revoking a session',
+      async () =>
+        await sessionsController().revokeSession('01936d1e-8f7a-7c3e-b8d4-9a1e2f3b4c5d', {
+          clearCookie: () => undefined,
+        } as never),
     ],
   ])('fails loudly when %s finds no principal', async (_name, run) => {
     // Not a 401: the guard is what answers that. Reaching here with no

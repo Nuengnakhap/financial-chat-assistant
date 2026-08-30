@@ -82,4 +82,12 @@ export interface SessionRepository {
    * family id is safe because it came from our own row, not from the request.
    */
   revokeFamily(familyId: SessionFamilyId, now: Date): Promise<number>;
+
+  /**
+   * Maintenance, so it has no `OwnerScope` either: it is not run on anyone's
+   * behalf. Removes sessions that stopped being usable before `cutoff`, and
+   * their tokens with them — `session_tokens` grows for the lifetime of every
+   * session and nothing else ever deletes from it.
+   */
+  deleteDeadBefore(cutoff: Date): Promise<number>;
 }

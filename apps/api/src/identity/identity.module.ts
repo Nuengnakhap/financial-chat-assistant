@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 
 import { CredentialPolicy } from './application/credential-policy';
+import { SessionJanitor } from './application/session-janitor';
 import { APP_CONFIG } from '../shared/config/app-config.token';
 import { PersistenceModule } from '../shared/persistence/persistence.module';
 import { RedisModule } from '../shared/redis/redis.module';
@@ -11,7 +12,10 @@ import { PASSWORD_HASHER } from './application/ports/password-hasher';
 import { TOKEN_ISSUER } from './application/ports/token-issuer';
 import { SessionIssuer } from './application/session-issuer';
 import { DescribeUserUseCase } from './application/use-cases/describe-user.use-case';
+import { ListSessionsUseCase } from './application/use-cases/list-sessions.use-case';
+import { PurgeDeadSessionsUseCase } from './application/use-cases/purge-dead-sessions.use-case';
 import { RegisterUserUseCase } from './application/use-cases/register-user.use-case';
+import { RevokeSessionUseCase } from './application/use-cases/revoke-session.use-case';
 import { RotateRefreshTokenUseCase } from './application/use-cases/rotate-refresh-token.use-case';
 import { SignInUseCase } from './application/use-cases/sign-in.use-case';
 import { SignOutUseCase } from './application/use-cases/sign-out.use-case';
@@ -28,6 +32,7 @@ import { RegistrationController } from './presentation/registration.controller';
 import { SessionCookies } from './presentation/session-cookies';
 import { SessionController } from './presentation/session.controller';
 import { SessionGuard } from './presentation/session.guard';
+import { SessionsController } from './presentation/sessions.controller';
 
 /**
  * Every binding for signing in, in one place. A use case names a port and gets
@@ -38,7 +43,12 @@ import { SessionGuard } from './presentation/session.guard';
   // `AppModule` is global, so the config and the logger arrive without asking.
   // These two are not, and a provider is only visible where it is imported.
   imports: [PersistenceModule, RedisModule],
-  controllers: [RegistrationController, SessionController, CurrentUserController],
+  controllers: [
+    RegistrationController,
+    SessionController,
+    CurrentUserController,
+    SessionsController,
+  ],
   providers: [
     { provide: PASSWORD_HASHER, useClass: Argon2PasswordHasher },
     { provide: TOKEN_ISSUER, useClass: FastJwtTokenIssuer },
@@ -57,6 +67,10 @@ import { SessionGuard } from './presentation/session.guard';
     RotateRefreshTokenUseCase,
     SignOutUseCase,
     DescribeUserUseCase,
+    ListSessionsUseCase,
+    RevokeSessionUseCase,
+    PurgeDeadSessionsUseCase,
+    SessionJanitor,
     SessionCookies,
     SessionGuard,
     // Global: every mutation from here on carries session cookies, and the one

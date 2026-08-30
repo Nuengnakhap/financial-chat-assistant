@@ -276,6 +276,138 @@ describe('listing sessions', () => {
   });
 });
 
+describe('purging dead sessions', () => {
+  const CUTOFF = new Date('2026-08-01T00:00:00Z');
+  const BEFORE = new Date('2026-07-01T00:00:00Z');
+  const AFTER = new Date('2026-08-20T00:00:00Z');
+
+  /** Written straight to the table: the point is the timestamps, not how they got there. */
+  const plant = async (row: {
+    createdAt: Date;
+    expiresAt: Date;
+    revokedAt?: Date;
+  }): Promise<SessionId> => {
+    const [inserted] = await h.db
+      .insert(sessions)
+      .values({
+        userId: ada,
+        familyId: SessionFamilyId.trusted(crypto.randomUUID()),
+        device: 'Firefox',
+        ipHash: hashOf('f'),
+        createdAt: row.createdAt,
+        lastUsedAt: row.createdAt,
+        expiresAt: row.expiresAt,
+        absoluteExpiresAt: row.expiresAt,
+        revokedAt: row.revokedAt ?? null,
+      })
+      .returning({ id: sessions.id });
+
+    if (inserted === undefined) throw new Error('session insert returned no row');
+    return inserted.id as SessionId;
+  };
+
+  const survivors = async (): Promise<string[]> =>
+    (await h.db.select({ id: sessions.id }).from(sessions)).map((row) => row.id);
+
+  it('removes one revoked before the cutoff, and its tokens with it', async () => {
+    const dead = await plant({
+      createdAt: BEFORE,
+      // Revoked long ago but nominally good for another year: the revocation is
+      // the clock that matters, and reading the wrong one keeps this forever.
+      expiresAt: new Date('2027-01-01T00:00:00Z'),
+      revokedAt: BEFORE,
+    });
+    await h.db.insert(sessionTokens).values({ hash: hashOf('a'), sessionId: dead });
+
+    expect(await repo.deleteDeadBefore(CUTOFF)).toBe(1);
+    expect(await survivors()).toEqual([]);
+    expect(await h.db.select().from(sessionTokens)).toEqual([]);
+  });
+
+  it('removes one that expired before the cutoff without ever being revoked', async () => {
+    await plant({ createdAt: BEFORE, expiresAt: new Date('2026-07-15T00:00:00Z') });
+
+    expect(await repo.deleteDeadBefore(CUTOFF)).toBe(1);
+    expect(await survivors()).toEqual([]);
+  });
+
+  it('keeps one revoked after the cutoff, however old the session is', async () => {
+    const recent = await plant({
+      createdAt: BEFORE,
+      expiresAt: new Date('2026-07-15T00:00:00Z'),
+      revokedAt: AFTER,
+    });
+
+    expect(await repo.deleteDeadBefore(CUTOFF)).toBe(0);
+    expect(await survivors()).toEqual([recent]);
+  });
+
+  it('never touches one that is still usable', async () => {
+    const live = await plant({
+      createdAt: new Date(Date.now() - DAY),
+      expiresAt: new Date(Date.now() + 30 * DAY),
+    });
+
+    expect(await repo.deleteDeadBefore(CUTOFF)).toBe(0);
+    expect(await survivors()).toEqual([live]);
+  });
+
+  it('keeps one that died exactly at the cutoff', async () => {
+    const onTheLine = await plant({
+      createdAt: BEFORE,
+      expiresAt: new Date('2027-01-01T00:00:00Z'),
+      revokedAt: CUTOFF,
+    });
+
+    // Strictly before, so the boundary is inclusive of survival — a sweep run
+    // twice a second apart must not disagree about the same row.
+    expect(await repo.deleteDeadBefore(CUTOFF)).toBe(0);
+    expect(await survivors()).toEqual([onTheLine]);
+  });
+
+  it('keeps going past one batch, and stops when the table is clean', async () => {
+    const dead = 600;
+    await h.db.insert(sessions).values(
+      Array.from({ length: dead }, () => ({
+        userId: ada,
+        familyId: SessionFamilyId.trusted(crypto.randomUUID()),
+        device: 'Firefox',
+        ipHash: hashOf('f'),
+        createdAt: BEFORE,
+        lastUsedAt: BEFORE,
+        expiresAt: new Date('2026-07-15T00:00:00Z'),
+        absoluteExpiresAt: new Date('2026-07-15T00:00:00Z'),
+      })),
+    );
+
+    // More than one batch of 500, so a loop that ran once would leave 100 behind
+    // and report the wrong number.
+    expect(await repo.deleteDeadBefore(CUTOFF)).toBe(dead);
+    expect(await survivors()).toEqual([]);
+  });
+
+  it('sorts a mixed table correctly in one pass', async () => {
+    await plant({ createdAt: BEFORE, expiresAt: new Date('2026-07-15T00:00:00Z') });
+    await plant({
+      createdAt: BEFORE,
+      expiresAt: new Date('2027-01-01T00:00:00Z'),
+      revokedAt: BEFORE,
+    });
+    const keptRevoked = await plant({
+      createdAt: BEFORE,
+      expiresAt: new Date('2027-01-01T00:00:00Z'),
+      revokedAt: AFTER,
+    });
+    const keptLive = await plant({
+      createdAt: new Date(Date.now() - DAY),
+      expiresAt: new Date(Date.now() + 30 * DAY),
+    });
+
+    expect(await repo.deleteDeadBefore(CUTOFF)).toBe(2);
+    expect((await survivors()).sort()).toEqual([keptRevoked, keptLive].sort());
+  });
+});
+
 describe('revoking', () => {
   it('succeeds once and only once', async () => {
     const created = await repo.create({ userId: ada }, newSession());

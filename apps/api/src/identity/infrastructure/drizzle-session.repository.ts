@@ -1,5 +1,5 @@
 import type { OwnerScope, SessionFamilyId, SessionId, UserId } from '@fca/domain';
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 
 import type { DbOrTx } from '../../shared/persistence/db-or-tx';
 import { sessions, sessionTokens } from '../../shared/persistence/schema';
@@ -37,6 +37,9 @@ interface PresentedTokenColumns {
   readonly reused: boolean;
   readonly within_grace: boolean;
 }
+
+/** Small enough that a lock is never held long, large enough to catch up quickly. */
+const PURGE_BATCH = 500;
 
 export class DrizzleSessionRepository implements SessionRepository {
   constructor(private readonly db: DbOrTx) {}
@@ -185,6 +188,44 @@ export class DrizzleSessionRepository implements SessionRepository {
       .returning({ id: sessions.id });
 
     return revoked.length === 1;
+  }
+
+  async deleteDeadBefore(cutoff: Date): Promise<number> {
+    let total = 0;
+    /* eslint-disable no-await-in-loop -- one batch at a time is the point: the
+       first sweep after a deploy meets everything that accumulated before the
+       janitor existed, and doing that in one statement is a long transaction
+       holding locks over rows nobody is waiting to read. */
+    for (;;) {
+      const removed = await this.deleteDeadBatch(cutoff, PURGE_BATCH);
+      total += removed;
+      if (removed < PURGE_BATCH) return total;
+    }
+    /* eslint-enable no-await-in-loop */
+  }
+
+  /**
+   * Counted from `rowCount` rather than `RETURNING`: the caller wants a number,
+   * and returning the ids would pull every deleted row into memory to produce it.
+   */
+  private async deleteDeadBatch(cutoff: Date, limit: number): Promise<number> {
+    // Two ways a session dies, and the clock that matters differs: a revoked
+    // one may still have a future expiry, and an expired one was never revoked.
+    const dead = or(
+      and(isNotNull(sessions.revokedAt), lt(sessions.revokedAt, cutoff)),
+      and(isNull(sessions.revokedAt), lt(sessions.expiresAt, cutoff)),
+    );
+
+    const result = await this.db
+      .delete(sessions)
+      .where(
+        inArray(
+          sessions.id,
+          this.db.select({ id: sessions.id }).from(sessions).where(dead).limit(limit),
+        ),
+      );
+
+    return result.rowCount ?? 0;
   }
 
   async revokeFamily(familyId: SessionFamilyId, now: Date): Promise<number> {
