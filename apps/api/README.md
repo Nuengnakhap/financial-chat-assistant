@@ -122,6 +122,23 @@ next endpoint lands.
 a renamed field breaks the build rather than a request. It reports which fields
 failed and never what they held: the body of `/auth/login` is a password.
 
+**Someone else's row is indistinguishable from one that does not exist.** Every
+repository of an owned resource takes an `OwnerScope`, so a query that forgot to
+filter by owner is not a call that can be written; the scope comes from the
+verified token and never from a body or a query string. Reaching for another
+user's session answers 404 rather than 403, and so does an id that is not even a
+UUID — a 403 confirms the id names something, and a 400 separates "wrong shape"
+from "not yours", which is half of what the 404 is hiding.
+
+Sessions and their tokens are the only tables that grow with every sign-in and
+every refresh and are never otherwise deleted from, so `SessionJanitor` sweeps
+the ones that stopped being usable longer ago than `SESSION_RETENTION_DAYS`. It
+is the first recurring job here and sets the shape for the rest: the loop
+registers with `TaskRegistry`, so shutdown waits for a sweep in progress and
+cancels one that is only sleeping, and a sweep that throws is logged rather than
+ending the loop — a janitor that stops after one bad night is one nobody notices
+has stopped.
+
 **Stopping is a sequence, not an event.** On `SIGTERM` or `SIGINT`, readiness is
 refused first and the process keeps serving for a grace period, so traffic has
 somewhere else to go. Only then do connections close, background work drains, and
