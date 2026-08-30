@@ -35,6 +35,14 @@ describe('a valid environment', () => {
     expect(config.usage.windowSeconds).toBe(3600);
     expect(config.auth.accessTokenTtlMs).toBe(900_000);
     expect(config.auth.refreshTokenTtlDays).toBe(30);
+    expect(config.auth.sessionAbsoluteTtlDays).toBe(90);
+    expect(config.auth.refreshReuseGraceMs).toBe(10_000);
+    expect(config.auth.throttle).toEqual({
+      windowMs: 300_000,
+      perEmail: 5,
+      perIp: 20,
+      registrationsPerIp: 10,
+    });
     expect(config.auth.cookieSecure).toBe(false);
     expect(config.app.otlpEndpoint).toBeNull();
   });
@@ -49,6 +57,19 @@ describe('a valid environment', () => {
     // of a thousand produces a token that either expires instantly or outlives
     // the session it was meant to bound, and neither shows up as an error.
     expect(loadConfig(withEnv({ ACCESS_TOKEN_TTL: value })).auth.accessTokenTtlMs).toBe(ms);
+  });
+
+  it.each([
+    ['0', 0],
+    ['10', 10_000],
+    ['300', 300_000],
+  ])('reads REFRESH_REUSE_GRACE_SECONDS=%s as %i milliseconds', (value, ms) => {
+    // Same trap as above, and worse here: a window a thousand times too wide
+    // stops reuse detection firing at all, and one that small never fires the
+    // race path — both look like the feature working.
+    expect(
+      loadConfig(withEnv({ REFRESH_REUSE_GRACE_SECONDS: value })).auth.refreshReuseGraceMs,
+    ).toBe(ms);
   });
 
   it('turns numeric strings into numbers, not strings that look like numbers', () => {

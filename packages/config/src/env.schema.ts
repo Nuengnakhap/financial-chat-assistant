@@ -77,6 +77,24 @@ export const envSchema = z.object({
   // goes through the same parse as a value from the environment.
   ACCESS_TOKEN_TTL: duration.prefault('15m'),
   REFRESH_TOKEN_TTL_DAYS: wholeNumber(1, 365).default(30),
+  /** The ceiling refreshing cannot push past, counted from when the session began. */
+  SESSION_ABSOLUTE_TTL_DAYS: wholeNumber(1, 3_650).default(90),
+  /**
+   * How long after a token is rotated away a second use of it still counts as
+   * two tabs racing rather than a stolen copy. Set to 0 to treat every one as
+   * theft.
+   */
+  REFRESH_REUSE_GRACE_SECONDS: wholeNumber(0, 300).default(10),
+
+  AUTH_THROTTLE_WINDOW_SECONDS: wholeNumber(1, 3_600).default(300),
+  /** An address is guessed far less often than a host is shared, hence two numbers. */
+  AUTH_THROTTLE_PER_EMAIL: wholeNumber(1, 1_000).default(5),
+  AUTH_THROTTLE_PER_IP: wholeNumber(1, 10_000).default(20),
+  /**
+   * Registering is counted per host only. Counting it per address would let
+   * anyone lock a known account out by registering its email over and over.
+   */
+  AUTH_THROTTLE_REGISTRATIONS_PER_IP: wholeNumber(1, 10_000).default(10),
   COOKIE_SECURE: z.stringbool().default(false),
 
   API_PORT: wholeNumber(1, 65_535).default(3_000),

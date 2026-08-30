@@ -30,7 +30,15 @@ export interface AppConfig {
     readonly jwtSecret: string;
     readonly accessTokenTtlMs: number;
     readonly refreshTokenTtlDays: number;
+    readonly sessionAbsoluteTtlDays: number;
+    readonly refreshReuseGraceMs: number;
     readonly cookieSecure: boolean;
+    readonly throttle: {
+      readonly windowMs: number;
+      readonly perEmail: number;
+      readonly perIp: number;
+      readonly registrationsPerIp: number;
+    };
   };
 }
 
@@ -88,7 +96,15 @@ function toAppConfig(env: Env): AppConfig {
       jwtSecret: env.JWT_SECRET,
       accessTokenTtlMs: env.ACCESS_TOKEN_TTL,
       refreshTokenTtlDays: env.REFRESH_TOKEN_TTL_DAYS,
+      sessionAbsoluteTtlDays: env.SESSION_ABSOLUTE_TTL_DAYS,
+      refreshReuseGraceMs: env.REFRESH_REUSE_GRACE_SECONDS * 1_000,
       cookieSecure: env.COOKIE_SECURE,
+      throttle: {
+        windowMs: env.AUTH_THROTTLE_WINDOW_SECONDS * 1_000,
+        perEmail: env.AUTH_THROTTLE_PER_EMAIL,
+        perIp: env.AUTH_THROTTLE_PER_IP,
+        registrationsPerIp: env.AUTH_THROTTLE_REGISTRATIONS_PER_IP,
+      },
     },
   };
 }
