@@ -21,7 +21,7 @@
     },
     "apps/web": {
       "entry": ["index.html", "src/**/*.spec.tsx", "src/**/*.spec.ts"],
-      "project": ["src/**/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx,css}"],
       "ignoreDependencies": ["jsdom"]
     },
     "apps/api": {

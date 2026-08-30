@@ -7,6 +7,17 @@
          404. A console that is never empty is a console nobody reads. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Financial Chat Assistant</title>
+    <!-- Light is the default, so this only has to restore a stored choice of
+         dark — and it has to run before the first paint, or everyone who chose
+         dark sees a white flash on every load. The key is asserted against
+         THEME_STORAGE_KEY by a test, because a literal here cannot import. -->
+    <script>
+      try {
+        if (localStorage.getItem('fca-theme') === 'dark') {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
