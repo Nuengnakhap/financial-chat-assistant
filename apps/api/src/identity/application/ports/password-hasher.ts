@@ -10,3 +10,5 @@ export interface PasswordHasher {
    */
   verify(storedHash: string | null, password: string): Promise<boolean>;
 }
+
+export const PASSWORD_HASHER = Symbol('PasswordHasher');

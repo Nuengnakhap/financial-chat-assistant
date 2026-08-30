@@ -30,8 +30,20 @@ export const K = {
    * Hashed rather than raw: a key name is visible to anyone who can list the
    * keyspace, and the throttle only ever needs equality.
    */
-  loginThrottle: (email: string): RedisKey =>
-    key(
-      `thr:login:e:{${createHash('sha256').update(email.trim().toLowerCase()).digest('hex').slice(0, 32)}}`,
-    ),
+  authThrottleEmail: (email: string): RedisKey => key(`thr:auth:e:{${digest(email)}}`),
+  /**
+   * Already a digest when it arrives: the address is hashed at the edge, so no
+   * layer below presentation — and nothing in the keyspace — ever holds one.
+   */
+  authThrottleIp: (ipHash: string): RedisKey => key(`thr:auth:ip:{${ipHash.slice(0, 32)}}`),
+  /** Separate from the sign-in counter: one must not be able to exhaust the other. */
+  registrationThrottleIp: (ipHash: string): RedisKey => key(`thr:reg:ip:{${ipHash.slice(0, 32)}}`),
 } as const;
+
+/**
+ * Hashed rather than raw: a key name is visible to anyone who can list the
+ * keyspace, and a throttle only ever needs equality.
+ */
+function digest(email: string): string {
+  return createHash('sha256').update(email.trim().toLowerCase()).digest('hex').slice(0, 32);
+}

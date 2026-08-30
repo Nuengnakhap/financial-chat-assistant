@@ -25,3 +25,5 @@ export interface TokenIssuer {
   /** The same function the issuer used, so a presented token can be looked up. */
   hashRefreshToken(token: string): string;
 }
+
+export const TOKEN_ISSUER = Symbol('TokenIssuer');

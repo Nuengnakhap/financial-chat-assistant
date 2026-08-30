@@ -27,15 +27,25 @@ describe('key registry', () => {
     expect(tag(K.streamStop(messageId))).toBe(tag(K.streamBuffer(messageId)));
   });
 
-  it('keeps the address out of the login throttle key', () => {
-    const key = K.loginThrottle('Someone@Example.com');
+  it('keeps the address out of the throttle key', () => {
+    const key = K.authThrottleEmail('Someone@Example.com');
 
     expect(key).not.toContain('Someone');
     expect(key).not.toContain('example.com');
-    expect(key).toMatch(/^thr:login:e:\{[0-9a-f]{32}\}$/);
+    expect(key).toMatch(/^thr:auth:e:\{[0-9a-f]{32}\}$/);
   });
 
   it('throttles an address the same way however it was typed', () => {
-    expect(K.loginThrottle('  Someone@Example.com ')).toBe(K.loginThrottle('someone@example.com'));
+    expect(K.authThrottleEmail('  Someone@Example.com ')).toBe(
+      K.authThrottleEmail('someone@example.com'),
+    );
+  });
+
+  it('counts signing in and registering under separate keys', () => {
+    const ipHash = 'f'.repeat(64);
+
+    // Sharing one key would let a burst of registrations lock a host out of
+    // signing in, which is the opposite of what the limit is for.
+    expect(K.registrationThrottleIp(ipHash)).not.toBe(K.authThrottleIp(ipHash));
   });
 });
