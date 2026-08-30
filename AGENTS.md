@@ -39,6 +39,9 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
 
 - Hexagonal: `presentation → application → domain`, `infrastructure → application`.
   Enforced by dependency-cruiser in CI, not by convention.
+- `apps/web` is feature-sliced, flowing one way from `app` down through `pages`,
+  `widgets`, `features`, `entities` to `shared`, and no slice imports a sibling
+  in its own layer. Same enforcement, same fixtures.
 - `packages/domain`, `packages/contracts`, `packages/grounding`, `packages/config`
   are framework-free: no NestJS, Drizzle, pg, ioredis, React imports there.
 - Every HTTP body and SSE event is defined once in `packages/contracts` and
@@ -91,8 +94,9 @@ Do not upgrade a major version as a side effect of another task.
   password hashing uses argon2's own async API, which has its own threads.
 - `TODO` must carry an issue reference: `// TODO(#123): ...`
 - Tests go in a `__tests__` directory next to the code they cover, named
-  `<module>.spec.ts`. Never beside the source file. A test that needs a real
-  database is `<module>.int.spec.ts` and runs only under `pnpm test:integration`.
+  `<module>.spec.ts` (`.spec.tsx` for a component). Never beside the source file.
+  A test that needs a real database is `<module>.int.spec.ts` and runs only under
+  `pnpm test:integration`.
 - Every domain invariant is also a database constraint, and an integration test
   makes each one fail. A constraint nobody has watched reject something may be
   misspelled.

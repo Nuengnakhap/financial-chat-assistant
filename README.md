@@ -19,7 +19,9 @@ This repository is under active development. What works today:
 | API platform (Nest on Fastify, health, errors, logging) | Working and verified |
 | Persistence (schema, constraints, unit of work, outbox) | Working and verified |
 | Runtime (Redis, background tasks, shutdown, CPU pool)   | Working and verified |
-| Application (auth, chat UI, streaming, grounding)       | Not built yet        |
+| Authentication (register, sign-in, sessions, isolation) | Working and verified |
+| Web client (shell, dev proxy, layer boundaries)         | Working and verified |
+| Chat (conversations, streaming, grounding, budget)      | Not built yet        |
 
 The commands below are the ones that run today. This section will grow as
 features land.
@@ -105,6 +107,7 @@ table, or run an expensive query.
 
 ```text
 apps/api/            NestJS on Fastify — see its README
+apps/web/            Vite + React browser client — see its README
 packages/domain/     Framework-free business rules — see its README
 packages/contracts/  Every HTTP body and SSE event, shared by API and web
 packages/config/     Environment parsing and typed configuration
@@ -115,13 +118,13 @@ tools/               Lint rules and the tests that prove the boundary rules work
 AGENTS.md            Operating rules for AI assistants working in this repository
 ```
 
-`apps/web` lands as development continues.
-
 ### How the layers are kept apart
 
 `packages/*` are framework-free: no NestJS, Drizzle, `pg`, `ioredis`, React or
-Fastify may be imported there, and inside `apps/api` a layer may only depend
-inwards (`presentation → application → domain`). Both rules live in
+Fastify may be imported there; inside `apps/api` a layer may only depend inwards
+(`presentation → application → domain`); and inside `apps/web` a feature-sliced
+layer may only depend downwards (`app → pages → widgets → features → entities →
+shared`), with no slice importing a sibling. All three live in
 `.dependency-cruiser.cjs` and fail `pnpm lint`, because an architecture that is
 only written down in a README is one convenient import away from being untrue.
 
@@ -145,25 +148,26 @@ streaming and tool calling.
 
 ## Scripts
 
-| Command                        | Description                                                |
-| ------------------------------ | ---------------------------------------------------------- |
-| `pnpm infra:up`                | Start PostgreSQL and Redis, waiting until both are healthy |
-| `pnpm infra:down`              | Stop the containers, keeping data                          |
-| `pnpm infra:reset`             | Stop the containers and delete their volumes               |
-| `pnpm infra:logs`              | Follow container logs                                      |
-| `pnpm db:seed`                 | Load the dataset, apply grants, create indexes             |
-| `pnpm db:verify`               | Run the checks shown above                                 |
-| `pnpm db:generate`             | Write a migration from the schema                          |
-| `pnpm db:migrate`              | Apply migrations as the schema owner                       |
-| `pnpm check`                   | Build, format, types, lint and unit tests — what CI runs   |
-| `pnpm format`                  | Apply Prettier (`format:check` only reports)               |
-| `pnpm typecheck`               | `tsc --noEmit` per package, tests included                 |
-| `pnpm lint`                    | ESLint, then dependency-cruiser, then knip                 |
-| `pnpm test`                    | Vitest, unit only — no Docker needed (`test:watch`)        |
-| `pnpm test:integration`        | Against a real PostgreSQL and Redis — needs Docker         |
-| `pnpm test:coverage`           | Both suites with coverage — needs Docker                   |
-| `pnpm build`                   | Emit `dist/` for every package, in dependency order        |
-| `pnpm --filter @fca/api start` | Run the built API on `API_PORT`                            |
+| Command                        | Description                                                    |
+| ------------------------------ | -------------------------------------------------------------- |
+| `pnpm infra:up`                | Start PostgreSQL and Redis, waiting until both are healthy     |
+| `pnpm infra:down`              | Stop the containers, keeping data                              |
+| `pnpm infra:reset`             | Stop the containers and delete their volumes                   |
+| `pnpm infra:logs`              | Follow container logs                                          |
+| `pnpm db:seed`                 | Load the dataset, apply grants, create indexes                 |
+| `pnpm db:verify`               | Run the checks shown above                                     |
+| `pnpm db:generate`             | Write a migration from the schema                              |
+| `pnpm db:migrate`              | Apply migrations as the schema owner                           |
+| `pnpm check`                   | Build, format, types, lint and unit tests — what CI runs       |
+| `pnpm format`                  | Apply Prettier (`format:check` only reports)                   |
+| `pnpm typecheck`               | `tsc --noEmit` per package, tests included                     |
+| `pnpm lint`                    | ESLint, then dependency-cruiser, then knip                     |
+| `pnpm test`                    | Vitest, unit only — no Docker needed (`test:watch`)            |
+| `pnpm test:integration`        | Against a real PostgreSQL and Redis — needs Docker             |
+| `pnpm test:coverage`           | Both suites with coverage — needs Docker                       |
+| `pnpm build`                   | Emit `dist/` for every package, in dependency order            |
+| `pnpm dev`                     | Build once, then the API on `:3000` and the web app on `:5173` |
+| `pnpm --filter @fca/api start` | Run the built API on `API_PORT`                                |
 
 ## Troubleshooting
 
