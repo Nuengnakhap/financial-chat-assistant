@@ -174,6 +174,28 @@ describe('anything at all can be thrown', () => {
   });
 });
 
+describe('a rate limit tells the caller how long to wait', () => {
+  it('sends Retry-After, which is the one detail wording cannot carry', async () => {
+    const response = await call('/boom/rate-limited');
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers['retry-after']).toBe('300');
+  });
+
+  it('still says nothing about which limit was hit', async () => {
+    const response = await call('/boom/rate-limited');
+
+    expect(response.body).not.toContain('email');
+    expect(response.body).not.toContain(DEVELOPER_MESSAGE);
+  });
+
+  it('does not send Retry-After for a failure that has no wait', async () => {
+    // A spent budget answers 429 too; suggesting a retry after 300 seconds
+    // would be wrong, because the window has not moved.
+    expect((await call('/boom/budget')).headers['retry-after']).toBeUndefined();
+  });
+});
+
 describe('correlation', () => {
   it('returns the request id in both the header and the body', async () => {
     const response = await call('/boom/not-found');

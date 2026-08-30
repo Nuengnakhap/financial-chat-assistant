@@ -1,4 +1,4 @@
-import { isDomainError, type DomainError } from '@fca/domain';
+import { RateLimitedError, isDomainError, type DomainError } from '@fca/domain';
 import { Catch, HttpException, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
@@ -34,8 +34,16 @@ export class DomainErrorFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const requestId = currentRequestId();
     const { status, body } = this.toAnswer(exception, requestId);
+    const reply = host.switchToHttp().getResponse<FastifyReply>();
 
-    host.switchToHttp().getResponse<FastifyReply>().status(status).send(body);
+    // The only detail of a failure that reaches the caller as more than wording:
+    // without it a client has to guess how long to wait, and guessing means
+    // retrying too soon.
+    if (exception instanceof RateLimitedError) {
+      void reply.header('retry-after', String(exception.retryAfterSeconds));
+    }
+
+    reply.status(status).send(body);
   }
 
   private toAnswer(exception: unknown, requestId: string): Answer {
