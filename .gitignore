@@ -18,6 +18,7 @@ coverage/
 playwright-report/
 test-results/
 .stryker-tmp/
+.playwright-mcp/
 
 # local data volumes
 pg_data/

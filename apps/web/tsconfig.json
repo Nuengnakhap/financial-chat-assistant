@@ -1,0 +1,21 @@
+{
+  // Editor, ESLint and `pnpm typecheck`. Covers tests and the Vite config, so
+  // type-aware rules reach them.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    // The browser is the runtime here; `node` types would let a server-only API
+    // typecheck in code that ships to a page.
+    "types": ["vite/client"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // Bundler resolution, not node16: Vite resolves the way a bundler does, and
+    // extensionless relative imports are what every React codebase writes.
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "vitest.setup.ts"]
+}

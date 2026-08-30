@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import prettierConfig from 'eslint-config-prettier/flat';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import importX from 'eslint-plugin-import-x';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -110,9 +111,24 @@ export default tseslint.config(
   },
 
   {
+    // The browser client. `globals.node` above would let `process` and `Buffer`
+    // typecheck in code that ships to a page, so the environment is replaced
+    // rather than extended.
+    files: ['apps/web/**/*.{ts,tsx}'],
+    extends: [reactHooks.configs.flat['recommended-latest']],
+    languageOptions: { globals: globals.browser },
+    rules: {
+      // The rule that catches a subscription, timer or AbortController with no
+      // cleanup, and derived state recomputed in an effect — the two failure
+      // modes AGENTS.md names for this package.
+      'react-hooks/exhaustive-deps': 'error',
+    },
+  },
+
+  {
     // A long table of cases is a feature, and tests must be able to build values
     // the type system forbids to prove the runtime guard against them fires.
-    files: ['**/__tests__/**/*.ts', '**/*.spec.ts', '**/*.test.ts'],
+    files: ['**/__tests__/**/*.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/*.test.{ts,tsx}'],
     rules: {
       'max-lines-per-function': 'off',
       'max-lines': 'off',

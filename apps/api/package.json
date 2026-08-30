@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
     "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "dev": "tsc -b tsconfig.build.json --watch --preserveWatchOutput & node --env-file-if-exists=../../.env --watch dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"

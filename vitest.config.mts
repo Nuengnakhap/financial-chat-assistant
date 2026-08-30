@@ -47,6 +47,19 @@ export default defineConfig({
         },
       },
       {
+        // The browser client. jsdom rather than a real browser: what these cover
+        // is component logic, and a Playwright run is what covers the browser.
+        // JSX needs no plugin here — `jsx: react-jsx` in the nearest tsconfig is
+        // what the default transform reads, the same way apps/api gets decorators.
+        test: {
+          name: 'web',
+          root: './apps/web',
+          environment: 'jsdom',
+          include: ['src/**/*.spec.ts', 'src/**/*.spec.tsx'],
+          setupFiles: ['./vitest.setup.ts'],
+        },
+      },
+      {
         test: {
           name: 'architecture',
           root: './tools',
@@ -61,11 +74,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'lcov'],
-      include: ['packages/*/src/**/*.ts', 'apps/api/src/**/*.ts'],
+      include: ['packages/*/src/**/*.ts', 'apps/api/src/**/*.ts', 'apps/web/src/**/*.{ts,tsx}'],
       // `__tests__` is test infrastructure, not product code; `main.ts` starts a
-      // process, which a unit test cannot do without becoming a worse copy of
-      // running the app.
-      exclude: ['**/__tests__/**', '**/index.ts', 'apps/api/src/main.ts'],
+      // process and `main.tsx` mounts into a document, neither of which a unit
+      // test can do without becoming a worse copy of running the app.
+      exclude: ['**/__tests__/**', '**/index.ts', 'apps/api/src/main.ts', 'apps/web/src/main.tsx'],
       thresholds: { statements: 95, branches: 95, functions: 95, lines: 95 },
     },
   },
