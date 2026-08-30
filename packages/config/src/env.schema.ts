@@ -29,7 +29,25 @@ const decimal = (min: number, max: number) =>
     .transform(Number)
     .pipe(z.number().min(min).max(max));
 
-const duration = z.string().regex(/^\d+[smhd]$/, 'must look like 15m, 24h or 30d');
+/**
+ * Parsed to milliseconds here rather than passed on as text, so nothing
+ * downstream has to agree with us about what `m` means.
+ */
+const MS_PER_UNIT: Readonly<Record<string, number>> = {
+  s: 1_000,
+  m: 60_000,
+  h: 3_600_000,
+  d: 86_400_000,
+};
+
+const duration = z
+  .string()
+  .regex(/^\d+[smhd]$/, 'must look like 15m, 24h or 30d')
+  .transform((value) => {
+    const unit = value.slice(-1);
+    return Number(value.slice(0, -1)) * (MS_PER_UNIT[unit] ?? 0);
+  })
+  .pipe(z.number().int().positive());
 
 /** Empty means "not configured", which is different from a malformed value. */
 const optionalUrl = z
@@ -55,7 +73,9 @@ export const envSchema = z.object({
   USAGE_WINDOW_SECONDS: wholeNumber(1, 2_678_400).default(3_600),
 
   JWT_SECRET: z.string().min(32, 'must be at least 32 characters'),
-  ACCESS_TOKEN_TTL: duration.default('15m'),
+  // `prefault` not `default`: the fallback is the text a person writes, and it
+  // goes through the same parse as a value from the environment.
+  ACCESS_TOKEN_TTL: duration.prefault('15m'),
   REFRESH_TOKEN_TTL_DAYS: wholeNumber(1, 365).default(30),
   COOKIE_SECURE: z.stringbool().default(false),
 

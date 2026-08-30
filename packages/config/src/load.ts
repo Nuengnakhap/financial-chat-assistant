@@ -28,7 +28,7 @@ export interface AppConfig {
   };
   readonly auth: {
     readonly jwtSecret: string;
-    readonly accessTokenTtl: string;
+    readonly accessTokenTtlMs: number;
     readonly refreshTokenTtlDays: number;
     readonly cookieSecure: boolean;
   };
@@ -86,7 +86,7 @@ function toAppConfig(env: Env): AppConfig {
     usage: { limitUsd: env.USAGE_LIMIT_USD, windowSeconds: env.USAGE_WINDOW_SECONDS },
     auth: {
       jwtSecret: env.JWT_SECRET,
-      accessTokenTtl: env.ACCESS_TOKEN_TTL,
+      accessTokenTtlMs: env.ACCESS_TOKEN_TTL,
       refreshTokenTtlDays: env.REFRESH_TOKEN_TTL_DAYS,
       cookieSecure: env.COOKIE_SECURE,
     },

@@ -33,8 +33,22 @@ describe('a valid environment', () => {
     expect(config.llm.baseUrl).toBe('https://api.openai.com/v1');
     expect(config.llm.model).toBe('gpt-5.6-luna');
     expect(config.usage.windowSeconds).toBe(3600);
+    expect(config.auth.accessTokenTtlMs).toBe(900_000);
+    expect(config.auth.refreshTokenTtlDays).toBe(30);
     expect(config.auth.cookieSecure).toBe(false);
     expect(config.app.otlpEndpoint).toBeNull();
+  });
+
+  it.each([
+    ['90s', 90_000],
+    ['15m', 900_000],
+    ['24h', 86_400_000],
+    ['30d', 2_592_000_000],
+  ])('reads ACCESS_TOKEN_TTL=%s as %i milliseconds', (value, ms) => {
+    // The unit is the whole point of parsing here: getting it wrong by a factor
+    // of a thousand produces a token that either expires instantly or outlives
+    // the session it was meant to bound, and neither shows up as an error.
+    expect(loadConfig(withEnv({ ACCESS_TOKEN_TTL: value })).auth.accessTokenTtlMs).toBe(ms);
   });
 
   it('turns numeric strings into numbers, not strings that look like numbers', () => {
@@ -79,6 +93,10 @@ describe('an invalid environment', () => {
     ['USAGE_LIMIT_USD', 'NaN'],
     ['USAGE_WINDOW_SECONDS', '-1'],
     ['ACCESS_TOKEN_TTL', '15 minutes'],
+    // The shape matches; the value does not. A token that has already expired
+    // when it is issued would fail on the request after the one that made it.
+    ['ACCESS_TOKEN_TTL', '0s'],
+    ['ACCESS_TOKEN_TTL', '0d'],
     ['COOKIE_SECURE', 'maybe'],
     ['COOKIE_SECURE', ''],
     ['NODE_ENV', 'staging'],
