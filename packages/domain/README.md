@@ -14,6 +14,7 @@ without a container, a database or a browser.
 | `errors.ts`                              | The closed set of domain error codes                             |
 | `assert.ts`                              | `assertNever` — makes an unhandled union variant a compile error |
 | `identifiers.ts`                         | Branded ids, parsed once at the boundary                         |
+| `ownership.ts`                           | `OwnerScope` — the owner a repository call is confined to        |
 | `money/micro-usd.vo.ts`                  | Integer micro-USD money                                          |
 | `conversation/message-status.machine.ts` | The lifecycle of a message                                       |
 | `generation/generation-phase.machine.ts` | The lifecycle of one attempt to answer                           |

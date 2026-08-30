@@ -15,7 +15,8 @@ src/
 │   ├── fastify.ts           adapter options, request-id hook
 │   ├── task-registry.ts     every background task, so shutdown can wait for it
 │   └── shutdown.ts          the order things stop in
-├── conversation/            first bounded context: ports and their Drizzle adapters
+├── conversation/            bounded context: ports and their Drizzle adapters
+├── identity/                bounded context: password hashing, tokens, sessions
 └── shared/
     ├── async/               the one place a timeout is written
     ├── config/              the APP_CONFIG token
@@ -27,11 +28,13 @@ src/
     └── redis/               RedisService, Lua scripts, the key registry
 ```
 
-Bounded contexts (`identity/`, `conversation/`, `generation/`, `budget/`) land as
-they are built, each split into `domain`, `application`, `infrastructure` and
+The remaining bounded contexts (`generation/`, `budget/`) land as they are
+built, each split into `domain`, `application`, `infrastructure` and
 `presentation`. A layer may only depend inwards and a context may not import
 another's internals — both enforced by `.dependency-cruiser.cjs`, with fixtures
-in `tools/architecture/` that prove the rules fire.
+in `tools/architecture/` that prove the rules fire. Anything two contexts need
+to say the same way, such as `OwnerScope`, lives in `@fca/domain` rather than in
+whichever one happened to need it first.
 
 ## Five rules this package exists to hold
 
@@ -74,6 +77,14 @@ Every invariant the domain states is also a database constraint — `UNIQUE`,
 `CHECK`, a partial unique index — because application code is the layer most
 likely to have the bug. `src/shared/persistence/__tests__/constraints.int.spec.ts`
 watches each one reject what it claims to.
+
+A refresh token is a row in `session_tokens` keyed by its own hash, not a column
+on `sessions`. That is what makes "no two sessions ever answer to one token" a
+primary key: with a current and a previous column, the same hash could be the
+live one on one row and the retired one on another, and the query that detects a
+stolen token would get two answers with nothing to choose between them.
+Superseded rows are kept, because presenting one is the evidence that a copy of
+it exists.
 
 **Stopping is a sequence, not an event.** On `SIGTERM` or `SIGINT`, readiness is
 refused first and the process keeps serving for a grace period, so traffic has
