@@ -48,6 +48,18 @@ export function currentPrincipal(): Principal | null {
   return storage.getStore()?.principal ?? null;
 }
 
+/**
+ * For a handler behind `SessionGuard`. Reaching one with no principal means the
+ * route was wired without the guard — a bug, not a caller who is not signed in,
+ * so it throws rather than answering 401.
+ */
+export function requirePrincipal(): Principal {
+  const principal = currentPrincipal();
+  if (principal === null) throw new Error('SessionGuard did not record a principal');
+
+  return principal;
+}
+
 /** Accepts an inbound id so a trace survives across services, but never trusts its shape. */
 export function toRequestId(header: unknown): string {
   return typeof header === 'string' && /^[\w-]{1,128}$/.test(header) ? header : randomUUID();

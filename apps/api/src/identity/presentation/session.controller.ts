@@ -5,7 +5,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { REFRESH_COOKIE, SessionCookies } from './session-cookies';
 import { SessionGuard } from './session.guard';
-import { currentPrincipal } from '../../shared/http/request-context';
+import { requirePrincipal } from '../../shared/http/request-context';
 import { RotateRefreshTokenUseCase } from '../application/use-cases/rotate-refresh-token.use-case';
 import { SignOutUseCase } from '../application/use-cases/sign-out.use-case';
 
@@ -53,10 +53,7 @@ export class SessionController {
   @HttpCode(authContract.logout.status)
   @UseGuards(SessionGuard)
   async logout(@Res({ passthrough: true }) reply: FastifyReply): Promise<Ok> {
-    const principal = currentPrincipal();
-    // The guard has run, so an absent principal is a wiring bug rather than a
-    // caller who is not signed in.
-    if (principal === null) throw new Error('SessionGuard did not record a principal');
+    const principal = requirePrincipal();
 
     await this.signOut.execute(principal.userId, principal.sessionId);
     this.cookies.clear(reply);
