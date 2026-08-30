@@ -107,6 +107,21 @@ the limit on the other door decorative. It is counted **per host only**:
 counting it per address would hand anyone a way to lock a known account out of
 signing in by registering its email over and over.
 
+**A token never reaches JavaScript.** Both session tokens leave as `httpOnly`
+cookies and never appear in a body, so a script that gets onto the page cannot
+read one; the refresh cookie is additionally pinned to `/api/v1/auth`, because
+every other request that carries it is a request that could leak it. The third
+cookie is the opposite on purpose: `fca_csrf` is readable, and a mutation that
+arrives carrying a session must echo it in a header. A cross-site page can make
+the browser send cookies but cannot read one, so the echo is proof the request
+came from our own script. The check applies whenever a session cookie is
+present rather than to a list of routes — a list is a thing to forget when the
+next endpoint lands.
+
+`ZodBody` binds a handler to the schema in `@fca/contracts` instead of a DTO, so
+a renamed field breaks the build rather than a request. It reports which fields
+failed and never what they held: the body of `/auth/login` is a password.
+
 **Stopping is a sequence, not an event.** On `SIGTERM` or `SIGINT`, readiness is
 refused first and the process keeps serving for a grace period, so traffic has
 somewhere else to go. Only then do connections close, background work drains, and
