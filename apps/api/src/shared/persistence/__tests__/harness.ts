@@ -40,7 +40,7 @@ export async function startHarness(): Promise<Harness> {
       // RESTART IDENTITY so outbox ids start from 1 in every test, and CASCADE
       // because the tables are a graph.
       await db.execute(
-        sql`TRUNCATE TABLE users, conversations, messages, outbox_events RESTART IDENTITY CASCADE`,
+        sql`TRUNCATE TABLE users, sessions, session_tokens, conversations, messages, outbox_events RESTART IDENTITY CASCADE`,
       );
     },
     close: async () => {

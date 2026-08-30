@@ -15,6 +15,13 @@
       "when": 1788018547023,
       "tag": "0001_outbox_type_check",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788069740466,
+      "tag": "0002_sessions",
+      "breakpoints": true
     }
   ]
 }

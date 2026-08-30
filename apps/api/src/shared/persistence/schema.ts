@@ -41,6 +41,82 @@ export const users = pgTable(
   ],
 );
 
+/**
+ * A sign-in that is still alive. The refresh token itself is not here: it lives
+ * in `session_tokens` so that "no two sessions ever answer to the same token"
+ * is one primary key instead of a rule spread across two nullable columns,
+ * where the same hash could be the current one on one row and the previous one
+ * on another and nothing would say which.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Rotation issues a new token, never a new family — theft is revoked by lineage. */
+    familyId: uuid('family_id').notNull(),
+    device: text().notNull(),
+    /** A hash, not an address: the session list shows it, so it must not be one. */
+    ipHash: text('ip_hash').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    // S1: a family is a chain, so only one link of it can be live at a time.
+    uniqueIndex('uq_sessions_family_active')
+      .on(table.familyId)
+      .where(sql`${table.revokedAt} IS NULL`),
+    check('chk_sessions_lifetime', sql`${table.expiresAt} > ${table.createdAt}`),
+    // Bounded by what `sessionView` in @fca/contracts will render.
+    check('chk_sessions_device_length', sql`char_length(${table.device}) between 1 and 200`),
+    check('chk_sessions_ip_hash_length', sql`char_length(${table.ipHash}) = 64`),
+    // Not partial, unlike the unique index above: PostgreSQL does not index the
+    // child side of a foreign key, and a partial one cannot serve the lookup
+    // that `ON DELETE CASCADE` runs, because that query says nothing about
+    // `revoked_at` for the planner to match. One index covers both the owner's
+    // list and the cascade rather than carrying a second for the latter.
+    index('idx_sessions_owner_recent').on(table.userId, table.lastUsedAt),
+  ],
+);
+
+/**
+ * Every refresh token ever issued for a session, as a SHA-256 digest. Keeping
+ * the superseded ones is what makes reuse detectable: presenting a token that
+ * has already been rotated away is the signal that a copy of it exists.
+ */
+export const sessionTokens = pgTable(
+  'session_tokens',
+  {
+    // S2: the hash is the key, so no two sessions can answer to one token in
+    // any state. This is the constraint the two-column shape could not express.
+    hash: text().primaryKey(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+    supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  },
+  (table) => [
+    // S3: one token per session is usable; the rest are history.
+    uniqueIndex('uq_session_tokens_live')
+      .on(table.sessionId)
+      .where(sql`${table.supersededAt} IS NULL`),
+    // Superseded rows are kept on purpose, so this table only grows. Without a
+    // plain index the cascade from a deleted session scans all of it, once per
+    // session, and so does the retention pass that trims old lineages.
+    index('idx_session_tokens_session').on(table.sessionId),
+    check('chk_session_tokens_hash_shape', sql`${table.hash} ~ '^[0-9a-f]{64}$'`),
+    check(
+      'chk_session_tokens_order',
+      sql`${table.supersededAt} IS NULL OR ${table.supersededAt} >= ${table.issuedAt}`,
+    ),
+  ],
+);
+
 export const conversationState = pgEnum('conversation_state', ['active', 'deleting']);
 
 export const conversations = pgTable(
@@ -163,6 +239,8 @@ export const outboxEvents = pgTable(
 );
 
 export type UserRow = typeof users.$inferSelect;
+export type SessionRow = typeof sessions.$inferSelect;
+export type SessionTokenRow = typeof sessionTokens.$inferSelect;
 export type ConversationRow = typeof conversations.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type OutboxEventRow = typeof outboxEvents.$inferSelect;

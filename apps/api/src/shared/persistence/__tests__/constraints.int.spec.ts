@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { conversations, messages, users } from '../schema';
+import { conversations, messages, sessionTokens, sessions, users } from '../schema';
 import { insertConversation, insertUser, startHarness, violationOf, type Harness } from './harness';
 
 /**
@@ -260,6 +260,176 @@ describe('M6 — a user message is neither empty nor a megabyte of prompt', () =
     );
 
     expect(reason).toContain('chk_user_message_length');
+  });
+});
+
+const HASH_A = 'a'.repeat(64);
+const HASH_B = 'b'.repeat(64);
+const FAMILY = 'aaaaaaaa-1111-4111-8111-111111111111';
+
+const session = (userId: string, familyId = FAMILY) => ({
+  userId,
+  familyId,
+  device: 'Firefox on macOS',
+  ipHash: 'f'.repeat(64),
+  expiresAt: new Date(Date.now() + 30 * 86_400_000),
+});
+
+async function insertSession(userId: string, familyId = FAMILY): Promise<string> {
+  const [row] = await h.db
+    .insert(sessions)
+    .values(session(userId, familyId))
+    .returning({ id: sessions.id });
+
+  if (row === undefined) throw new Error('session insert returned no row');
+  return row.id;
+}
+
+describe('S1 — a family has one live session at a time', () => {
+  it('refuses a second session in a family that is still live', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    await insertSession(userId);
+
+    const reason = await violationOf(() => h.db.insert(sessions).values(session(userId)));
+
+    expect(reason).toContain('uq_sessions_family_active');
+  });
+
+  it('allows a new one once the family is revoked', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    await insertSession(userId);
+
+    await h.db.update(sessions).set({ revokedAt: new Date() });
+
+    await expect(h.db.insert(sessions).values(session(userId))).resolves.toBeDefined();
+  });
+
+  it('does not stop two different families being live at once', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    await insertSession(userId);
+
+    await expect(
+      h.db.insert(sessions).values(session(userId, 'bbbbbbbb-1111-4111-8111-111111111111')),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe('S2 — a refresh token answers to exactly one session', () => {
+  it('refuses the same hash on a second session, whatever its state', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    const first = await insertSession(userId);
+    const second = await insertSession(userId, 'bbbbbbbb-1111-4111-8111-111111111111');
+    await h.db.insert(sessionTokens).values({ hash: HASH_A, sessionId: first });
+    // Superseded on one row and current on another is precisely the ambiguity
+    // the two-column shape allowed and this key forbids.
+    await h.db.update(sessionTokens).set({ supersededAt: new Date() });
+
+    const reason = await violationOf(() =>
+      h.db.insert(sessionTokens).values({ hash: HASH_A, sessionId: second }),
+    );
+
+    expect(reason).toContain('session_tokens_pkey');
+  });
+
+  it('refuses a hash that is not a sha-256 digest', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    const sessionId = await insertSession(userId);
+
+    const reason = await violationOf(() =>
+      h.db.insert(sessionTokens).values({ hash: 'not-a-digest', sessionId }),
+    );
+
+    expect(reason).toContain('chk_session_tokens_hash_shape');
+  });
+});
+
+describe('S3 — a session has one usable token at a time', () => {
+  it('refuses a second live token', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    const sessionId = await insertSession(userId);
+    await h.db.insert(sessionTokens).values({ hash: HASH_A, sessionId });
+
+    const reason = await violationOf(() =>
+      h.db.insert(sessionTokens).values({ hash: HASH_B, sessionId }),
+    );
+
+    expect(reason).toContain('uq_session_tokens_live');
+  });
+
+  it('allows the next one once the previous is superseded', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    const sessionId = await insertSession(userId);
+    await h.db.insert(sessionTokens).values({ hash: HASH_A, sessionId });
+
+    await h.db.update(sessionTokens).set({ supersededAt: new Date() });
+
+    await expect(
+      h.db.insert(sessionTokens).values({ hash: HASH_B, sessionId }),
+    ).resolves.toBeDefined();
+  });
+
+  it('refuses a token superseded before it was issued', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    const sessionId = await insertSession(userId);
+
+    const reason = await violationOf(() =>
+      h.db.insert(sessionTokens).values({
+        hash: HASH_A,
+        sessionId,
+        issuedAt: new Date(),
+        supersededAt: new Date(Date.now() - 1_000),
+      }),
+    );
+
+    expect(reason).toContain('chk_session_tokens_order');
+  });
+});
+
+describe('a session is bounded and belongs to a user', () => {
+  it('refuses one that has already expired', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+
+    const reason = await violationOf(() =>
+      h.db
+        .insert(sessions)
+        .values({ ...session(userId), expiresAt: new Date(Date.now() - 86_400_000) }),
+    );
+
+    expect(reason).toContain('chk_sessions_lifetime');
+  });
+
+  it.each([
+    ['blank', '', 'chk_sessions_device_length'],
+    ['longer than the contract renders', 'x'.repeat(201), 'chk_sessions_device_length'],
+  ])('refuses a device name that is %s', async (_name, device, constraint) => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+
+    const reason = await violationOf(() =>
+      h.db.insert(sessions).values({ ...session(userId), device }),
+    );
+
+    expect(reason).toContain(constraint);
+  });
+
+  it('refuses an address where a hash of one belongs', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+
+    const reason = await violationOf(() =>
+      h.db.insert(sessions).values({ ...session(userId), ipHash: '203.0.113.7' }),
+    );
+
+    expect(reason).toContain('chk_sessions_ip_hash_length');
+  });
+
+  it('takes its sessions and their tokens with the user', async () => {
+    const userId = await insertUser(h.db, 'ada@example.com');
+    const sessionId = await insertSession(userId);
+    await h.db.insert(sessionTokens).values({ hash: HASH_A, sessionId });
+
+    await h.db.delete(users);
+
+    expect(await h.db.select().from(sessions)).toEqual([]);
+    expect(await h.db.select().from(sessionTokens)).toEqual([]);
   });
 });
 
