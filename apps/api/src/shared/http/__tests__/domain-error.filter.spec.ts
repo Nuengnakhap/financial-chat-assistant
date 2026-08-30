@@ -4,6 +4,8 @@ import {
   ForbiddenError,
   InvalidTransitionError,
   NotFoundError,
+  RateLimitedError,
+  UnauthenticatedError,
   UnverifiableClaimError,
   ValidationError,
   type DomainError,
@@ -58,6 +60,14 @@ class BoomController {
   unverifiable(): never {
     throw new UnverifiableClaimError(DEVELOPER_MESSAGE);
   }
+  @Get('unauthenticated')
+  unauthenticated(): never {
+    throw new UnauthenticatedError(DEVELOPER_MESSAGE);
+  }
+  @Get('rate-limited')
+  rateLimited(): never {
+    throw new RateLimitedError(DEVELOPER_MESSAGE, 300, { scope: 'email' });
+  }
   @Get('budget')
   budget(): never {
     throw new BudgetExceededError(DEVELOPER_MESSAGE);
@@ -107,11 +117,13 @@ const call = async (path: string) =>
 describe('a domain failure becomes the status its code implies', () => {
   it.each([
     ['/boom/validation', 400, 'validation'],
+    ['/boom/unauthenticated', 401, 'unauthenticated'],
     ['/boom/forbidden', 403, 'forbidden'],
     ['/boom/not-found', 404, 'not_found'],
     ['/boom/conflict', 409, 'conflict'],
     ['/boom/transition', 409, 'invalid_transition'],
     ['/boom/unverifiable', 422, 'unverifiable'],
+    ['/boom/rate-limited', 429, 'rate_limited'],
     ['/boom/budget', 429, 'budget_exceeded'],
   ])('%s answers %i with code %s', async (path, status, code) => {
     const response = await call(path);
@@ -214,7 +226,9 @@ describe('a framework failure never speaks in the framework voice', () => {
     const response = await call('/boom/unauthorized');
 
     expect(response.statusCode).toBe(401);
-    expect(response.json<{ code: string }>().code).toBe('unauthorized');
+    // The same code the domain uses for 401: a client switches on one name,
+    // whether the refusal came from a guard or from deep inside the framework.
+    expect(response.json<{ code: string }>().code).toBe('unauthenticated');
     // Nest would otherwise forward "jwt signature mismatch for key kid-7".
     expect(response.body).not.toContain('jwt');
     expect(response.body).not.toContain('kid-7');
@@ -260,14 +274,16 @@ describe('the error taxonomy is covered', () => {
     // via assertNever; this catches the other half — a code with no route here.
     const errors: readonly DomainError[] = [
       new ValidationError('x'),
+      new UnauthenticatedError('x'),
       new ForbiddenError('x'),
       new NotFoundError('x'),
       new ConflictError('x'),
       new InvalidTransitionError('x'),
       new UnverifiableClaimError('x'),
+      new RateLimitedError('x', 1),
       new BudgetExceededError('x'),
     ];
 
-    expect(new Set(errors.map((error) => error.code)).size).toBe(7);
+    expect(new Set(errors.map((error) => error.code)).size).toBe(9);
   });
 });

@@ -3,9 +3,13 @@ import type { DomainErrorCode } from '@fca/domain';
 /**
  * What a client may receive. Wider than `DomainErrorCode` on purpose: the domain
  * describes business failures, and the transport adds the ones only it can have
- * — a request that could not be read, a caller that has not signed in, a bug.
+ * — a request that could not be read, and a bug.
+ *
+ * "Not signed in" is deliberately not one of them: the identity context owns
+ * that as `unauthenticated`, and two names for one 401 would make a client
+ * switch on both.
  */
-export type ApiErrorCode = DomainErrorCode | 'bad_request' | 'unauthorized' | 'internal';
+export type ApiErrorCode = DomainErrorCode | 'bad_request' | 'internal';
 
 /**
  * The failure half of the API envelope. The success half arrives with the first
@@ -21,11 +25,13 @@ export interface ApiFailure {
 
 const STATUS_BY_CODE: Readonly<Record<DomainErrorCode, number>> = {
   validation: 400,
+  unauthenticated: 401,
   forbidden: 403,
   not_found: 404,
   conflict: 409,
   invalid_transition: 409,
   unverifiable: 422,
+  rate_limited: 429,
   budget_exceeded: 429,
 };
 
@@ -46,13 +52,15 @@ export function codeForHttpStatus(status: number): ApiErrorCode {
     case 422:
       return 'bad_request';
     case 401:
-      return 'unauthorized';
+      return 'unauthenticated';
     case 403:
       return 'forbidden';
     case 404:
       return 'not_found';
     case 409:
       return 'conflict';
+    case 429:
+      return 'rate_limited';
     default:
       return 'internal';
   }
@@ -69,12 +77,13 @@ export function codeForHttpStatus(status: number): ApiErrorCode {
 const MESSAGE_BY_CODE: Readonly<Record<ApiErrorCode, string>> = {
   validation: 'The request could not be understood. Check the fields and try again.',
   bad_request: 'The request could not be read. Check the size and format of what you sent.',
-  unauthorized: 'You need to sign in to do that.',
+  unauthenticated: 'You need to sign in to do that.',
   forbidden: 'You do not have access to this.',
   not_found: 'That does not exist, or is no longer available.',
   conflict: 'That conflicts with the current state. Reload and try again.',
   invalid_transition: 'That conflicts with the current state. Reload and try again.',
   unverifiable: 'The answer could not be verified against the data, so it was not shown.',
+  rate_limited: 'Too many attempts. Wait a moment and try again.',
   budget_exceeded: 'You have reached your usage limit for this period.',
   internal: 'Something went wrong on our side. Please try again.',
 };

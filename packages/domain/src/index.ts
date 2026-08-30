@@ -15,6 +15,8 @@ export {
   ForbiddenError,
   InvalidTransitionError,
   NotFoundError,
+  RateLimitedError,
+  UnauthenticatedError,
   UnverifiableClaimError,
   ValidationError,
   isDomainError,

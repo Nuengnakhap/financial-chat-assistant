@@ -7,6 +7,8 @@ import {
   ForbiddenError,
   InvalidTransitionError,
   NotFoundError,
+  RateLimitedError,
+  UnauthenticatedError,
   UnverifiableClaimError,
   ValidationError,
   isDomainError,
@@ -15,6 +17,7 @@ import {
 
 const CASES: readonly [new (message: string) => DomainError, DomainErrorCode, string][] = [
   [ValidationError, 'validation', 'ValidationError'],
+  [UnauthenticatedError, 'unauthenticated', 'UnauthenticatedError'],
   [NotFoundError, 'not_found', 'NotFoundError'],
   [ConflictError, 'conflict', 'ConflictError'],
   [ForbiddenError, 'forbidden', 'ForbiddenError'],
@@ -50,6 +53,39 @@ describe('the error taxonomy', () => {
 
   it('produces a usable stack trace', () => {
     expect(new ConflictError('x').stack).toContain('ConflictError');
+  });
+});
+
+describe('RateLimitedError', () => {
+  it('carries the wait as a field and in details, so a header and a log both have it', () => {
+    const error = new RateLimitedError('too many login attempts', 300);
+
+    expect(error.retryAfterSeconds).toBe(300);
+    expect(error.details).toEqual({ retryAfterSeconds: 300 });
+  });
+
+  it('keeps details the caller supplied alongside it', () => {
+    const error = new RateLimitedError('too many', 60, { scope: 'email' });
+
+    expect(error.details).toEqual({ scope: 'email', retryAfterSeconds: 60 });
+  });
+
+  it.each([-5, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 1e21])(
+    'refuses %o, which has no meaning as a Retry-After',
+    (invalid) => {
+      // A limiter that produces one of these is broken. Rejecting at
+      // construction keeps the mistake near its cause rather than turning into
+      // a header a client cannot parse.
+      expect(() => new RateLimitedError('too many', invalid)).toThrow(TypeError);
+    },
+  );
+
+  it('allows zero, which means retry now', () => {
+    expect(new RateLimitedError('too many', 0).retryAfterSeconds).toBe(0);
+  });
+
+  it('is separate from a spent budget, though both answer 429', () => {
+    expect(new RateLimitedError('x', 1).code).not.toBe(new BudgetExceededError('y').code);
   });
 });
 
