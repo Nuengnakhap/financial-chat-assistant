@@ -29,6 +29,7 @@ export {
   GenerationId,
   MessageId,
   ReservationId,
+  SessionId,
   UserId,
   type Brand,
   type IdentifierCodec,

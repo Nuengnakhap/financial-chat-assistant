@@ -87,8 +87,8 @@ Do not upgrade a major version as a side effect of another task.
 - Functions ≤40 lines, complexity ≤10, files ≤400 lines.
 - zod parses at boundaries only (HTTP body, env, tool args, data read from Redis).
 - No floating promises. Background work registers with `TaskRegistry`.
-- CPU-bound work (tokenizer, password hashing) runs on the worker pool, never on
-  the event loop.
+- CPU-bound work never runs on the event loop. The tokenizer goes to `CpuPool`;
+  password hashing uses argon2's own async API, which has its own threads.
 - `TODO` must carry an issue reference: `// TODO(#123): ...`
 - Tests go in a `__tests__` directory next to the code they cover, named
   `<module>.spec.ts`. Never beside the source file. A test that needs a real

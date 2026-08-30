@@ -12,6 +12,7 @@ export type Brand<T, B extends string> = T & { readonly [brand]: B };
 export type UserId = Brand<string, 'UserId'>;
 export type ConversationId = Brand<string, 'ConversationId'>;
 export type MessageId = Brand<string, 'MessageId'>;
+export type SessionId = Brand<string, 'SessionId'>;
 export type GenerationId = Brand<string, 'GenerationId'>;
 export type ReservationId = Brand<string, 'ReservationId'>;
 export type ClientMessageId = Brand<string, 'ClientMessageId'>;
@@ -45,6 +46,7 @@ function uuidCodec<T extends string>(label: string): IdentifierCodec<T> {
 export const UserId: IdentifierCodec<UserId> = uuidCodec('UserId');
 export const ConversationId: IdentifierCodec<ConversationId> = uuidCodec('ConversationId');
 export const MessageId: IdentifierCodec<MessageId> = uuidCodec('MessageId');
+export const SessionId: IdentifierCodec<SessionId> = uuidCodec('SessionId');
 export const GenerationId: IdentifierCodec<GenerationId> = uuidCodec('GenerationId');
 export const ReservationId: IdentifierCodec<ReservationId> = uuidCodec('ReservationId');
 export const ClientMessageId: IdentifierCodec<ClientMessageId> = uuidCodec('ClientMessageId');
