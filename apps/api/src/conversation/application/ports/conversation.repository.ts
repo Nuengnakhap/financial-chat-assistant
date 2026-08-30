@@ -1,13 +1,4 @@
-import type { ConversationId, UserId } from '@fca/domain';
-
-/**
- * Ownership is a parameter, not a caller's responsibility to remember. Every
- * method takes a scope and every query filters on it, so "list someone else's
- * conversations" is not a call that can be written.
- */
-export interface OwnerScope {
-  readonly userId: UserId;
-}
+import type { ConversationId, OwnerScope } from '@fca/domain';
 
 export interface ConversationSummary {
   readonly id: ConversationId;

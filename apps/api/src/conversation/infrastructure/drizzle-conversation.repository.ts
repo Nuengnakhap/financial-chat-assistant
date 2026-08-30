@@ -1,4 +1,4 @@
-import type { ConversationId } from '@fca/domain';
+import type { ConversationId, OwnerScope } from '@fca/domain';
 import { and, desc, eq } from 'drizzle-orm';
 
 import type { DbOrTx } from '../../shared/persistence/db-or-tx';
@@ -7,7 +7,6 @@ import type {
   ConversationRepository,
   ConversationSummary,
   NewConversation,
-  OwnerScope,
 } from '../application/ports/conversation.repository';
 
 const COLUMNS = {

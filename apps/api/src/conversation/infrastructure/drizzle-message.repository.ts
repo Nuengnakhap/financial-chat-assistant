@@ -1,10 +1,9 @@
-import type { ConversationId, MessageId, MessageStatus } from '@fca/domain';
+import type { ConversationId, MessageId, MessageStatus, OwnerScope } from '@fca/domain';
 import { and, asc, eq, sql } from 'drizzle-orm';
 
 import type { DbOrTx } from '../../shared/persistence/db-or-tx';
 import { isUniqueViolationOf } from '../../shared/persistence/pg-errors';
 import { conversations, messages } from '../../shared/persistence/schema';
-import type { OwnerScope } from '../application/ports/conversation.repository';
 import type {
   AppendMessage,
   MessageRepository,

@@ -1,6 +1,10 @@
-import type { ClientMessageId, ConversationId, MessageId, MessageStatus } from '@fca/domain';
-
-import type { OwnerScope } from './conversation.repository';
+import type {
+  ClientMessageId,
+  ConversationId,
+  MessageId,
+  MessageStatus,
+  OwnerScope,
+} from '@fca/domain';
 
 export interface AppendMessage {
   readonly conversationId: ConversationId;

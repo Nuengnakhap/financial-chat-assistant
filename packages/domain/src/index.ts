@@ -29,11 +29,13 @@ export {
   GenerationId,
   MessageId,
   ReservationId,
+  SessionFamilyId,
   SessionId,
   UserId,
   type Brand,
   type IdentifierCodec,
 } from './identifiers';
+export { type OwnerScope } from './ownership';
 export {
   Err,
   Ok,

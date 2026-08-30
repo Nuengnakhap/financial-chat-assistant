@@ -13,6 +13,8 @@ export type UserId = Brand<string, 'UserId'>;
 export type ConversationId = Brand<string, 'ConversationId'>;
 export type MessageId = Brand<string, 'MessageId'>;
 export type SessionId = Brand<string, 'SessionId'>;
+/** The lineage a session belongs to: rotation makes a new token, not a new family. */
+export type SessionFamilyId = Brand<string, 'SessionFamilyId'>;
 export type GenerationId = Brand<string, 'GenerationId'>;
 export type ReservationId = Brand<string, 'ReservationId'>;
 export type ClientMessageId = Brand<string, 'ClientMessageId'>;
@@ -47,6 +49,7 @@ export const UserId: IdentifierCodec<UserId> = uuidCodec('UserId');
 export const ConversationId: IdentifierCodec<ConversationId> = uuidCodec('ConversationId');
 export const MessageId: IdentifierCodec<MessageId> = uuidCodec('MessageId');
 export const SessionId: IdentifierCodec<SessionId> = uuidCodec('SessionId');
+export const SessionFamilyId: IdentifierCodec<SessionFamilyId> = uuidCodec('SessionFamilyId');
 export const GenerationId: IdentifierCodec<GenerationId> = uuidCodec('GenerationId');
 export const ReservationId: IdentifierCodec<ReservationId> = uuidCodec('ReservationId');
 export const ClientMessageId: IdentifierCodec<ClientMessageId> = uuidCodec('ClientMessageId');
