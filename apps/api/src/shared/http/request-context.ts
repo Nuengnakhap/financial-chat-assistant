@@ -1,8 +1,22 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 
+import type { SessionId, UserId } from '@fca/domain';
+
+/** Everything a handler is allowed to believe about who is calling. */
+export interface Principal {
+  readonly userId: UserId;
+  readonly sessionId: SessionId;
+}
+
 export interface RequestContext {
   readonly requestId: string;
+  /**
+   * Filled in by the guard once a token has been verified, and only there.
+   * Living here rather than on the request object is what stops a use case
+   * having to be handed a request to find out who is asking.
+   */
+  principal: Principal | null;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -18,6 +32,20 @@ export function runWithRequestContext<T>(context: RequestContext, fn: () => T): 
  */
 export function currentRequestId(): string {
   return storage.getStore()?.requestId ?? 'no-request';
+}
+
+/**
+ * Recorded on the context the request is already running inside, so it reaches
+ * everything downstream without being threaded through a signature.
+ */
+export function setPrincipal(principal: Principal): void {
+  const context = storage.getStore();
+  if (context !== undefined) context.principal = principal;
+}
+
+/** `null` outside a request, and for any request that has not been through the guard. */
+export function currentPrincipal(): Principal | null {
+  return storage.getStore()?.principal ?? null;
 }
 
 /** Accepts an inbound id so a trace survives across services, but never trusts its shape. */

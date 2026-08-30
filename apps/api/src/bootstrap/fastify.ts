@@ -20,7 +20,7 @@ export function createFastifyAdapter(): FastifyAdapter {
     void reply.header('x-request-id', requestId);
     // Everything downstream — handlers, logs, the error filter — reads the id
     // from here rather than being handed it through every signature.
-    runWithRequestContext({ requestId }, done);
+    runWithRequestContext({ requestId, principal: null }, done);
   });
 
   return adapter;

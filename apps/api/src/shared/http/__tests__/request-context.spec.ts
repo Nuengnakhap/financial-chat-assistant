@@ -1,10 +1,57 @@
 import { describe, expect, it } from 'vitest';
 
-import { currentRequestId, runWithRequestContext, toRequestId } from '../request-context';
+import {
+  currentPrincipal,
+  currentRequestId,
+  runWithRequestContext,
+  setPrincipal,
+  toRequestId,
+} from '../request-context';
+
+const PRINCIPAL = {
+  userId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' as never,
+  sessionId: '01936d1e-8f7a-7c3e-b8d4-9a1e2f3b4c5d' as never,
+};
+
+describe('carrying who is calling', () => {
+  it('reaches everything inside the request the guard recorded it in', () => {
+    const seen = runWithRequestContext({ requestId: 'req-1', principal: null }, () => {
+      setPrincipal(PRINCIPAL);
+      return currentPrincipal();
+    });
+
+    expect(seen).toEqual(PRINCIPAL);
+  });
+
+  it('is null before a guard has run', () => {
+    expect(
+      runWithRequestContext({ requestId: 'req-1', principal: null }, () => currentPrincipal()),
+    ).toBeNull();
+  });
+
+  it('does not leak out of the request that set it', () => {
+    runWithRequestContext({ requestId: 'req-1', principal: null }, () => {
+      setPrincipal(PRINCIPAL);
+    });
+
+    expect(currentPrincipal()).toBeNull();
+  });
+
+  it('is a no-op outside a request rather than a crash', () => {
+    // Background work has no caller; recording one must not be what stops a
+    // task from running.
+    expect(() => {
+      setPrincipal(PRINCIPAL);
+    }).not.toThrow();
+    expect(currentPrincipal()).toBeNull();
+  });
+});
 
 describe('reading the current request id', () => {
   it('returns the id inside a request', () => {
-    expect(runWithRequestContext({ requestId: 'req-1' }, () => currentRequestId())).toBe('req-1');
+    expect(
+      runWithRequestContext({ requestId: 'req-1', principal: null }, () => currentRequestId()),
+    ).toBe('req-1');
   });
 
   it('returns a placeholder outside one, rather than throwing', () => {
@@ -14,9 +61,9 @@ describe('reading the current request id', () => {
   });
 
   it('keeps nested scopes apart', () => {
-    const seen = runWithRequestContext({ requestId: 'outer' }, () => [
+    const seen = runWithRequestContext({ requestId: 'outer', principal: null }, () => [
       currentRequestId(),
-      runWithRequestContext({ requestId: 'inner' }, () => currentRequestId()),
+      runWithRequestContext({ requestId: 'inner', principal: null }, () => currentRequestId()),
       currentRequestId(),
     ]);
 
