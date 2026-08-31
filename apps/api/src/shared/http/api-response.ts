@@ -1,27 +1,16 @@
+import type { ApiErrorCode, ApiFailure } from '@fca/contracts';
 import type { DomainErrorCode } from '@fca/domain';
 
 /**
- * What a client may receive. Wider than `DomainErrorCode` on purpose: the domain
- * describes business failures, and the transport adds the ones only it can have
- * — a request that could not be read, and a bug.
+ * The envelope itself is defined in `@fca/contracts` because both sides read it.
+ * What stays here is server behaviour: which status a code answers with, and the
+ * wording a person sees.
  *
- * "Not signed in" is deliberately not one of them: the identity context owns
- * that as `unauthenticated`, and two names for one 401 would make a client
+ * "Not signed in" is deliberately not a transport code: the identity context
+ * owns that as `unauthenticated`, and two names for one 401 would make a client
  * switch on both.
  */
-export type ApiErrorCode = DomainErrorCode | 'bad_request' | 'internal';
-
-/**
- * The failure half of the API envelope. The success half arrives with the first
- * endpoint that returns data — health probes answer a bare shape on purpose,
- * since they are read by infrastructure rather than by the app client.
- */
-export interface ApiFailure {
-  readonly code: ApiErrorCode;
-  /** Written for a person to read. Never a developer message, never a stack. */
-  readonly message: string;
-  readonly requestId: string;
-}
+export type { ApiErrorCode, ApiFailure };
 
 const STATUS_BY_CODE: Readonly<Record<DomainErrorCode, number>> = {
   validation: 400,

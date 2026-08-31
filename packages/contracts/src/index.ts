@@ -51,6 +51,12 @@ export {
 } from './sse/stream-events.contract';
 
 export {
+  apiErrorCode,
+  apiFailure,
+  type ApiErrorCode,
+  type ApiFailure,
+} from './http/failure.contract';
+export {
   authContract,
   loginBody,
   registerBody,
