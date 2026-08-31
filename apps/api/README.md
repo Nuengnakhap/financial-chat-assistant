@@ -170,6 +170,33 @@ user's session answers 404 rather than 403, and so does an id that is not even a
 UUID — a 403 confirms the id names something, and a 400 separates "wrong shape"
 from "not yours", which is half of what the 404 is hiding.
 
+A message is written once however many times it is sent. The browser generates
+a `clientMessageId` per send and a retry carries the same one, so
+`uq_message_client_id` is what makes the second write impossible — not a read
+beforehand, which two simultaneous requests would both pass. The read that
+matters happens after the constraint has spoken: the row it collided with is
+fetched and answered with, marked as not newly created, so a client that
+retried gets its message rather than an error it cannot act on.
+
+Allocating the sequence number needs the retry as much as the clever `INSERT`.
+Computing `MAX(seq) + 1` inside the statement keeps the read and the write
+together but does not serialise them: under read committed two appends see the
+same committed maximum and the second loses to `uq_message_seq`. Two things make
+that survivable, and both were measured rather than assumed. Each attempt runs
+in a scope of its own — a `SAVEPOINT` when there is already a transaction —
+because a unique violation aborts the transaction it fires in and PostgreSQL
+then refuses every statement until that transaction ends, so a retry issued in
+the same scope answers `current transaction is aborted` instead of trying again.
+And the retry waits a random moment first, scaled by how many times this writer
+has already lost: retrying instantly sends every loser back into the same
+instant, which lost seven to ten of a hundred concurrent sends with every stored
+sequence still gapless — work missing rather than work wrong, and invisible to a
+test that checks only the numbers.
+
+The first message also names the conversation, in the same transaction that
+wrote it, so a crash cannot leave a title describing a message that was rolled
+back.
+
 A conversation is deleted in two halves. The request marks it `deleting` and
 writes `conversation.delete_requested` to the outbox in one transaction, then
 answers 202 — from that moment it is absent from every read, because the clause

@@ -9,6 +9,13 @@ export interface ConversationSummary {
   readonly updatedAt: Date;
 }
 
+/** `title: null` leaves the name alone; a string replaces it. */
+export interface ConversationActivity {
+  readonly id: ConversationId;
+  readonly at: Date;
+  readonly title: string | null;
+}
+
 export interface NewConversation {
   readonly id: ConversationId;
   readonly title: string;
@@ -32,6 +39,13 @@ export interface ConversationRepository {
     scope: OwnerScope,
     request: PageRequest<ConversationCursor>,
   ): Promise<Page<ConversationSummary, ConversationCursor>>;
+  /**
+   * Records that something was said in a conversation. `updated_at` is what the
+   * list is ordered by, so a conversation someone is using comes back to the
+   * top — and the first message is also what names it, which is one statement
+   * here rather than a second write that could land without the first.
+   */
+  touch(scope: OwnerScope, activity: ConversationActivity): Promise<void>;
   /** Returns false when the row is already being deleted, or is not the caller's. */
   markDeleting(scope: OwnerScope, id: ConversationId, now: Date): Promise<boolean>;
   /**

@@ -10,6 +10,7 @@ import {
   type PageRequest,
 } from '../application/pagination';
 import type {
+  ConversationActivity,
   ConversationRepository,
   ConversationSummary,
   NewConversation,
@@ -65,6 +66,19 @@ export class DrizzleConversationRepository implements ConversationRepository {
       updatedAt: row.updatedAt,
       id: row.id,
     }));
+  }
+
+  async touch(scope: OwnerScope, activity: ConversationActivity): Promise<void> {
+    await this.db
+      .update(conversations)
+      .set(
+        activity.title === null
+          ? { updatedAt: activity.at }
+          : { updatedAt: activity.at, title: activity.title },
+      )
+      .where(
+        and(eq(conversations.id, activity.id), eq(conversations.userId, scope.userId), VISIBLE),
+      );
   }
 
   async markDeleting(scope: OwnerScope, id: ConversationId, now: Date): Promise<boolean> {

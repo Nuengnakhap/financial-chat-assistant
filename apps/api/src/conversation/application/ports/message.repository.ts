@@ -1,3 +1,4 @@
+import type { GroundingReport } from '@fca/contracts';
 import type {
   ClientMessageId,
   ConversationId,
@@ -27,6 +28,12 @@ export interface StoredMessage {
   readonly role: 'user' | 'assistant';
   readonly status: MessageStatus;
   readonly parts: readonly unknown[];
+  /**
+   * Present exactly when an assistant message is `complete` — the pairing that
+   * `chk_complete_has_verification` holds, carried up so a caller reads it
+   * rather than reconstructing it.
+   */
+  readonly verification: GroundingReport | null;
   readonly createdAt: Date;
 }
 
@@ -37,6 +44,15 @@ export interface MessageRepository {
    * between simultaneous sends is whatever the database settles on.
    */
   append(message: AppendMessage): Promise<StoredMessage>;
+  /**
+   * The row a duplicate `clientMessageId` collided with. `null` when the send
+   * is the first of its kind — which is the ordinary case, and why the read
+   * happens on the way out of a conflict rather than before every write.
+   */
+  findByClientId(
+    conversationId: ConversationId,
+    clientMessageId: ClientMessageId,
+  ): Promise<StoredMessage | null>;
   /**
    * A conversation is read from its end: the first page is the newest messages,
    * and paging moves backwards through older ones — which is the direction

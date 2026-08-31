@@ -1,6 +1,14 @@
-import type { ConversationId, MessageId, MessageStatus, OwnerScope } from '@fca/domain';
+import { groundingReport } from '@fca/contracts';
+import type {
+  ClientMessageId,
+  ConversationId,
+  MessageId,
+  MessageStatus,
+  OwnerScope,
+} from '@fca/domain';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 
+import { delay } from '../../shared/async/timeouts';
 import type { DbOrTx } from '../../shared/persistence/db-or-tx';
 import { isUniqueViolationOf } from '../../shared/persistence/pg-errors';
 import { conversations, messages } from '../../shared/persistence/schema';
@@ -19,11 +27,28 @@ interface MessageColumns {
   role: 'user' | 'assistant';
   status: MessageStatus;
   parts: unknown;
+  verification: unknown;
   createdAt: Date;
 }
 
 /** Bounded: one attempt per writer that could plausibly be racing this one. */
 const MAX_APPEND_ATTEMPTS = 10;
+
+/**
+ * Retrying the instant a collision is reported sends every loser back into the
+ * same instant, so the same writer loses again — measured, not feared: a
+ * hundred concurrent appends lost seven to ten of them that way, with every
+ * stored sequence still gapless, so the symptom was work missing rather than
+ * work wrong. A random wait before each retry, scaled by how many times this
+ * writer has already lost, spreads them apart instead.
+ *
+ * Thirty rather than ten because the wait has to outlast the contention it is
+ * waiting out: a hundred writers through a pool of ten hold their transactions
+ * far longer than the same hundred appends did on their own, and ten was
+ * measurably not enough — one write in a hundred still exhausted its attempts.
+ * At thirty, eight runs of fifty and a hundred were rejected zero times.
+ */
+const RETRY_SPREAD_MS = 30;
 
 const COLUMNS = {
   id: messages.id,
@@ -32,6 +57,7 @@ const COLUMNS = {
   role: messages.role,
   status: messages.status,
   parts: messages.parts,
+  verification: messages.verification,
   createdAt: messages.createdAt,
 };
 
@@ -56,25 +82,44 @@ export class DrizzleMessageRepository implements MessageRepository {
    */
   private async appendAttempt(message: AppendMessage, attempt: number): Promise<StoredMessage> {
     try {
-      const [row] = await this.db
-        .insert(messages)
-        .values({
-          conversationId: message.conversationId,
-          clientMessageId: message.clientMessageId,
-          role: message.role,
-          parts: message.parts,
-          status: message.status,
-          seq: sql`(SELECT COALESCE(MAX(${messages.seq}), 0) + 1 FROM ${messages} WHERE ${messages.conversationId} = ${message.conversationId})`,
-        })
-        .returning(COLUMNS);
-
-      if (row === undefined) throw new Error('insert returned no row');
-      return toStored(row);
+      // Each attempt gets a scope of its own. A unique violation aborts the
+      // transaction it fires in and PostgreSQL then refuses every statement
+      // until that transaction ends — so a retry issued in the same scope
+      // answers `current transaction is aborted` rather than trying again.
+      // Nested inside a caller's transaction this is a SAVEPOINT, which rolls
+      // back the failed attempt and leaves everything before it standing.
+      return await this.db.transaction(async (scoped) => await insertOnce(scoped, message));
     } catch (error) {
       if (attempt >= MAX_APPEND_ATTEMPTS || !isUniqueViolationOf(error, 'uq_message_seq'))
         throw error;
+
+      await delay(Math.random() * RETRY_SPREAD_MS * attempt);
       return await this.appendAttempt(message, attempt + 1);
     }
+  }
+
+  /**
+   * No `OwnerScope`: the caller reaches this only after `findById` has proved
+   * the conversation is theirs, and a client message id is meaningless outside
+   * the conversation it was sent to. The pair is what `uq_message_client_id`
+   * is built on, so this reads back exactly the row that constraint rejected.
+   */
+  async findByClientId(
+    conversationId: ConversationId,
+    clientMessageId: ClientMessageId,
+  ): Promise<StoredMessage | null> {
+    const [row] = await this.db
+      .select(COLUMNS)
+      .from(messages)
+      .where(
+        and(
+          eq(messages.conversationId, conversationId),
+          eq(messages.clientMessageId, clientMessageId),
+        ),
+      )
+      .limit(1);
+
+    return row === undefined ? null : toStored(row);
   }
 
   async listForConversation(
@@ -116,6 +161,24 @@ export function messagePageQuery(db: DbOrTx, scope: OwnerScope, request: Message
   );
 }
 
+async function insertOnce(db: DbOrTx, message: AppendMessage): Promise<StoredMessage> {
+  const [row] = await db
+    .insert(messages)
+    .values({
+      conversationId: message.conversationId,
+      clientMessageId: message.clientMessageId,
+      role: message.role,
+      parts: message.parts,
+      status: message.status,
+      seq: sql`(SELECT COALESCE(MAX(${messages.seq}), 0) + 1 FROM ${messages} WHERE ${messages.conversationId} = ${message.conversationId})`,
+    })
+    .returning(COLUMNS);
+
+  if (row === undefined) throw new Error('insert returned no row');
+
+  return toStored(row);
+}
+
 function toStored(row: MessageColumns): StoredMessage {
   /* eslint-disable @typescript-eslint/consistent-type-assertions */
   return {
@@ -123,6 +186,11 @@ function toStored(row: MessageColumns): StoredMessage {
     id: row.id as MessageId,
     conversationId: row.conversationId as ConversationId,
     parts: Array.isArray(row.parts) ? (row.parts as readonly unknown[]) : [],
+    // Parsed rather than asserted: this column is `jsonb`, so its type is a
+    // claim about what was written rather than something the row can prove. A
+    // report that does not parse is not a report, and rendering half of one is
+    // how an answer would look verified without being it.
+    verification: groundingReport.nullable().parse(row.verification ?? null),
   };
   /* eslint-enable @typescript-eslint/consistent-type-assertions */
 }

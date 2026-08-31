@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { IdentityModule } from '../identity/identity.module';
+import { AppendUserMessageUseCase } from './application/use-cases/append-user-message.use-case';
 import { CreateConversationUseCase } from './application/use-cases/create-conversation.use-case';
 import { DescribeConversationUseCase } from './application/use-cases/describe-conversation.use-case';
 import { ListConversationsUseCase } from './application/use-cases/list-conversations.use-case';
@@ -23,6 +24,7 @@ import { PersistenceModule } from '../shared/persistence/persistence.module';
   controllers: [ConversationsController, ConversationController],
   providers: [
     ListConversationsUseCase,
+    AppendUserMessageUseCase,
     CreateConversationUseCase,
     DescribeConversationUseCase,
     RemoveConversationUseCase,
@@ -32,6 +34,8 @@ import { PersistenceModule } from '../shared/persistence/persistence.module';
   ],
   // The composition root builds the handler list; this is the one this context
   // contributes to it.
-  exports: [ConversationDeletionSubscriber],
+  // `AppendUserMessageUseCase` leaves for the generation context, which is what
+  // calls it: writing the message is where sending one begins.
+  exports: [ConversationDeletionSubscriber, AppendUserMessageUseCase],
 })
 export class ConversationModule {}

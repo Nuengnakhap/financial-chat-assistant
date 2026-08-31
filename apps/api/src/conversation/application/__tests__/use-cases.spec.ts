@@ -1,9 +1,17 @@
-import { ConversationId, type DomainEvent, type OwnerScope, type UserId } from '@fca/domain';
+import {
+  ClientMessageId,
+  ConversationId,
+  type DomainEvent,
+  type OwnerScope,
+  type UserId,
+} from '@fca/domain';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TxContext, UnitOfWork } from '../../../shared/persistence/unit-of-work';
 import { conversationCursor } from '../pagination';
 import type { ConversationRepository } from '../ports/conversation.repository';
+import type { MessageRepository } from '../ports/message.repository';
+import { AppendUserMessageUseCase } from '../use-cases/append-user-message.use-case';
 import { CreateConversationUseCase } from '../use-cases/create-conversation.use-case';
 import { DescribeConversationUseCase } from '../use-cases/describe-conversation.use-case';
 import { ListConversationsUseCase } from '../use-cases/list-conversations.use-case';
@@ -27,6 +35,19 @@ const findById = vi.fn();
 const listForOwner = vi.fn();
 const markDeleting = vi.fn();
 const purge = vi.fn();
+const touch = vi.fn();
+const listForConversation = vi.fn();
+const appendMessage = vi.fn();
+const findByClientId = vi.fn();
+const messageRepository = (): MessageRepository => ({
+  append: appendMessage,
+  findByClientId,
+  listForConversation,
+});
+
+/** What the driver hands up, wrapped the way drizzle wraps it. */
+const violation = (code: string, constraint: string): Error =>
+  new Error('Failed query', { cause: Object.assign(new Error('rejected'), { code, constraint }) });
 const published: DomainEvent[] = [];
 
 const repository = (): ConversationRepository => ({
@@ -35,6 +56,7 @@ const repository = (): ConversationRepository => ({
   listForOwner,
   markDeleting,
   purge,
+  touch,
 });
 
 /**
@@ -47,6 +69,7 @@ const uow: UnitOfWork = {
   run: async (work) =>
     await work({
       conversations: repository(),
+      messages: messageRepository(),
       publish: (event) => {
         published.push(event);
       },
@@ -210,5 +233,72 @@ describe('finishing a deletion', () => {
     purge.mockResolvedValue(false);
 
     expect(await new PurgeConversationUseCase(uow).execute(ID)).toBe(false);
+  });
+});
+
+describe('writing what somebody sent', () => {
+  const CLIENT_ID = ClientMessageId.trusted('9b1e2f3a-4c5d-4e6f-8a9b-0c1d2e3f4a5b');
+  const sent = { conversationId: ID, clientMessageId: CLIENT_ID, content: 'hello' };
+  const written = {
+    id: '2b8e1b4a-6a1e-4d5e-9c3f-0f1a2b3c4d5e',
+    seq: 1,
+    createdAt: NOW,
+  };
+
+  it('answers not found when the conversation went while it was being written to', () => {
+    // The delete pipeline can take the row away between the read and the write,
+    // and the foreign key is what notices. A caller asked to write into
+    // something that is not there, which is the answer they get for asking to
+    // write into somebody else's.
+    findById.mockResolvedValue(summary());
+    appendMessage.mockRejectedValue(
+      violation('23503', 'messages_conversation_id_conversations_id_fk'),
+    );
+
+    return expect(new AppendUserMessageUseCase(uow).execute(SCOPE, sent)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_found' },
+    });
+  });
+
+  it('answers with the message it already wrote when the send is a repeat', async () => {
+    findById.mockResolvedValue(summary());
+    appendMessage.mockRejectedValue(violation('23505', 'uq_message_client_id'));
+    findByClientId.mockResolvedValue(written);
+
+    const again = await new AppendUserMessageUseCase(uow).execute(SCOPE, sent);
+
+    expect(again.ok && again.value.created).toBe(false);
+    expect(again.ok && again.value.message.id).toBe(written.id);
+  });
+
+  it('raises anything else rather than dressing it as a missing conversation', async () => {
+    // A constraint nobody planned for is a bug, and a 404 would hide it.
+    findById.mockResolvedValue(summary());
+    appendMessage.mockRejectedValue(violation('23514', 'chk_user_message_length'));
+
+    await expect(new AppendUserMessageUseCase(uow).execute(SCOPE, sent)).rejects.toThrow(
+      'Failed query',
+    );
+  });
+
+  it('names the conversation after the first message and leaves the rest alone', async () => {
+    findById.mockResolvedValue(summary());
+    appendMessage.mockResolvedValue({ ...written, seq: 1 });
+    await new AppendUserMessageUseCase(uow).execute(SCOPE, sent);
+    expect(touch).toHaveBeenCalledWith(SCOPE, { id: ID, at: NOW, title: 'hello' });
+
+    appendMessage.mockResolvedValue({ ...written, seq: 2 });
+    await new AppendUserMessageUseCase(uow).execute(SCOPE, sent);
+    expect(touch).toHaveBeenLastCalledWith(SCOPE, { id: ID, at: NOW, title: null });
+  });
+
+  it('writes nothing into a conversation that is not the sender to write in', async () => {
+    findById.mockResolvedValue(null);
+
+    const refused = await new AppendUserMessageUseCase(uow).execute(SCOPE, sent);
+
+    expect(!refused.ok && refused.error.code).toBe('not_found');
+    expect(appendMessage).not.toHaveBeenCalled();
   });
 });
