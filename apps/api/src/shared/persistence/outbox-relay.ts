@@ -14,6 +14,8 @@ export interface OutboxPublisher {
   publish(events: readonly PublishedEvent[]): Promise<void>;
 }
 
+export const OUTBOX_PUBLISHER = Symbol('OutboxPublisher');
+
 export interface PublishedEvent extends DomainEvent {
   /** Stable across redeliveries, so a consumer can deduplicate on it. */
   readonly id: string;

@@ -23,3 +23,6 @@ allowBuilds:
   ssh2: false
   # Installs a code-generation CLI we never invoke.
   protobufjs: false
+  # A native encoder BullMQ's msgpackr can use. msgpackr falls back to its own
+  # JavaScript implementation, which is what every test here runs against.
+  msgpackr-extract: false

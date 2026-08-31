@@ -4,6 +4,7 @@ import { APP_FILTER } from '@nestjs/core';
 
 import { TaskRegistry } from './bootstrap/task-registry';
 import { ConversationModule } from './conversation/conversation.module';
+import { ConversationDeletionSubscriber } from './conversation/infrastructure/conversation-deletion.subscriber';
 import { IdentityModule } from './identity/identity.module';
 import { APP_CONFIG } from './shared/config/app-config.token';
 import { CpuModule } from './shared/cpu/cpu.module';
@@ -14,6 +15,8 @@ import { DomainErrorFilter } from './shared/http/domain-error.filter';
 import { AppLogger, createPinoLogger } from './shared/observability/app-logger';
 import { DatabaseService } from './shared/persistence/database.service';
 import { PersistenceModule } from './shared/persistence/persistence.module';
+import { DOMAIN_EVENT_HANDLERS, type DomainEventHandler } from './shared/queue/domain-events';
+import { QueueModule } from './shared/queue/queue.module';
 import { RedisModule } from './shared/redis/redis.module';
 import { RedisService } from './shared/redis/redis.service';
 
@@ -24,7 +27,14 @@ import { RedisService } from './shared/redis/redis.service';
  */
 @Global()
 @Module({
-  imports: [PersistenceModule, RedisModule, CpuModule, IdentityModule, ConversationModule],
+  imports: [
+    PersistenceModule,
+    RedisModule,
+    CpuModule,
+    IdentityModule,
+    ConversationModule,
+    QueueModule,
+  ],
   controllers: [HealthController],
   providers: [
     { provide: APP_CONFIG, useFactory: (): AppConfig => loadConfig(process.env) },
@@ -50,8 +60,18 @@ import { RedisService } from './shared/redis/redis.service';
       inject: [DatabaseService, RedisService],
     },
     { provide: READINESS_TIMEOUT_MS, useValue: 1_000 },
+    // Who consumes which domain event, stated in one place for the same reason
+    // the readiness list is: a second list contributed by a module would
+    // silently replace this one rather than add to it.
+    {
+      provide: DOMAIN_EVENT_HANDLERS,
+      useFactory: (deletion: ConversationDeletionSubscriber): readonly DomainEventHandler[] => [
+        deletion,
+      ],
+      inject: [ConversationDeletionSubscriber],
+    },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
   ],
-  exports: [APP_CONFIG, AppLogger, ReadinessProbe, TaskRegistry],
+  exports: [APP_CONFIG, AppLogger, ReadinessProbe, TaskRegistry, DOMAIN_EVENT_HANDLERS],
 })
 export class AppModule {}

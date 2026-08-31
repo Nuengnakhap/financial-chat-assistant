@@ -25,6 +25,7 @@ src/
     ├── http/                response envelope, error filter, request context, session guard
     ├── observability/       AppLogger and the bridge NestJS logs through
     ├── persistence/         schema, DatabaseService, UnitOfWork, outbox relay
+    ├── queue/               the pump that drains the outbox, and the worker that runs it
     └── redis/               RedisService, Lua scripts, the key registry
 ```
 
@@ -72,6 +73,22 @@ outbox insert commit together, or neither does. Writing the row and then
 enqueueing has a window where a crash leaves a message nobody will ever generate,
 or a job for a message that was rolled back. The relay publishes before it marks,
 so delivery is at-least-once and consumers deduplicate on the event id.
+
+`OutboxPump` is what drives it — a task registered with `TaskRegistry`, polling
+rather than waiting on `LISTEN/NOTIFY`, because a notification nobody is
+listening for at that instant is lost and the whole point of the outbox is that
+nothing is. `DomainEventWorker` runs the other end, dispatching a job to
+whichever handler declares that type and finishing quietly when none does: the
+outbox records every event the domain has, and failing the ones nothing consumes
+would fill the failed set with things working as intended. Who consumes what is
+composed at the composition root, next to the readiness list and for the same
+reason. Both halves run in the API process and still speak through Redis, so
+moving the worker into its own process changes where it is started and nothing
+about how either behaves.
+
+A job arrives from Redis, which is outside this process, so it goes through zod
+exactly as an HTTP body does — a queue outlives a deployment, and yesterday's
+job is still in it after a rename.
 
 Every invariant the domain states is also a database constraint — `UNIQUE`,
 `CHECK`, a partial unique index — because application code is the layer most
@@ -158,12 +175,20 @@ writes `conversation.delete_requested` to the outbox in one transaction, then
 answers 202 — from that moment it is absent from every read, because the clause
 that hides it is in the repository rather than in each use case, and
 `ConversationSummary` carries no state for a caller to forget to check. The rows
-go afterwards, in a worker: a conversation may have a generation running against
-it, and stopping that crosses Redis and a queue and has to survive being
+go afterwards, in the worker: a conversation may have a generation running
+against it, and stopping that crosses Redis and a queue and has to survive being
 retried, none of which one HTTP request can offer. Deleting the same
 conversation twice is a 404 the second time, and publishes nothing — the update
 is conditional on the conversation still being active, so two clicks cannot
 queue two deletions.
+
+The worker removes only a conversation that is in `deleting`, and that predicate
+is what stands in for the ownership check it has no caller to make: an id
+arriving from anywhere cannot destroy a conversation somebody is still using.
+Removing one that is already gone answers `false` rather than throwing, because
+at-least-once delivery makes a second attempt ordinary rather than exceptional —
+and the messages go with the conversation through the database's own cascade,
+not a second delete this code has to remember.
 
 Sessions and their tokens are the only tables that grow with every sign-in and
 every refresh and are never otherwise deleted from, so `SessionJanitor` sweeps
