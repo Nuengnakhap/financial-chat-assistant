@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
@@ -18,6 +20,23 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    // `@fca/contracts` is built as CommonJS, because the API that also imports
+    // it is. A browser asking a CommonJS file for a named export gets nothing,
+    // and pre-bundling it instead traded that for a worse fault: Vite keys its
+    // cache on the lockfile, not on a workspace package's output, so adding an
+    // export to the contracts left the cached copy without it and the import
+    // silently became `undefined` — a blank screen, no request, no error.
+    //
+    // Resolving to the source removes both. Vite compiles the TypeScript, an
+    // edit to a contract hot-reloads the page, and there is no cache to go
+    // stale. Types still come from the built `.d.ts`, and `pnpm build` keeps
+    // that in step.
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+        '@fca/contracts': fileURLToPath(new URL('../../packages/contracts/src', import.meta.url)),
+      },
+    },
     server: {
       port: 5173,
       strictPort: true,

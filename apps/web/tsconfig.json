@@ -15,7 +15,10 @@
     // extensionless relative imports are what every React codebase writes.
     "module": "preserve",
     "moduleResolution": "bundler",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // One way to name a module from anywhere. `../../` chains break the moment a
+    // file moves, and they hide which layer an import is crossing.
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "vitest.setup.ts"]
 }

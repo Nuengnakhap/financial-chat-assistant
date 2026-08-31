@@ -1,0 +1,227 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * The only stylesheet in this application, and the only place a value is
+ * decided. Everything below is a closed set: each scale starts with
+ * `*: initial`, which deletes Tailwind's own, so a utility that is not listed
+ * here does not exist. `p-5` compiles to nothing rather than to something
+ * slightly wrong.
+ *
+ * Nothing enforces itself, so three tests do:
+ *   __tests__/tokens.spec.ts    — one stylesheet, and every class in the source
+ *                                 compiles to a rule (an off-scale class is a
+ *                                 failure with a file and a line, not silence)
+ *   __tests__/contrast.spec.ts  — every pair the interface renders clears WCAG
+ *   local/no-off-token-styles   — bans `p-[13px]` and inline `style`, the two
+ *                                 ways around all of the above
+ *
+ * The direction is editorial: structure comes from hairlines, white space and
+ * type, not from cards, fills and shadows. There is no depth scale at all, and
+ * that is the point — see `--shadow-*` below.
+ */
+@theme {
+  /* ─── colour ────────────────────────────────────────────────────────────
+     The interface is paper and ink. Exactly one hue is saturated —
+     `verified` — and it means the figure beside it was checked against the
+     query result. Restraint here is not taste, it is the one thing colour is
+     allowed to say: a link is not green, a button is not green, and nothing
+     decorative borrows the hue that means "this number is real". */
+  --color-*: initial;
+
+  --color-surface: oklch(1 0 0);
+  --color-panel: oklch(0.983 0.002 250);
+  --color-raised: oklch(0.962 0.003 250);
+
+  /* `line` rules off a region; `line-strong` is the edge of a control. The
+     second has to clear 3:1 because it is what tells someone an input is
+     there — the first only has to be seen, and 1.4.11 does not ask more of a
+     divider than that. */
+  --color-line: oklch(0.875 0.005 250);
+  --color-line-strong: oklch(0.6 0.011 250);
+
+  --color-text: oklch(0.185 0.009 250);
+  --color-muted: oklch(0.495 0.011 250);
+
+  --color-ink: oklch(0.185 0.009 250);
+  --color-on-ink: oklch(0.99 0 0);
+
+  /* The figure treatment: mono numerals on `verified-soft`, and the badge that
+     counts them in `verified`. Read by the surface that renders a verified
+     answer, which is the only place either of them is allowed to appear. */
+  --color-verified: oklch(0.42 0.105 168);
+  --color-verified-soft: oklch(0.955 0.022 168);
+
+  --color-negative: oklch(0.475 0.185 25);
+  --color-warning: oklch(0.55 0.13 65);
+  --color-positive: oklch(0.46 0.115 155);
+
+  /* ─── spacing ───────────────────────────────────────────────────────────
+     A 4px rhythm, ten steps, plus zero. The gaps in the sequence are the point: a scale
+     with every number in it is a scale nobody can hold in their head, and it is
+     how 13px and 15px end up three lines apart. The three largest exist because
+     this direction sets a page by its margins. */
+  --spacing-*: initial;
+
+  /* Not a step in the rhythm — the absence of one. It is here because a flex
+     child defaults to `min-width: auto` and refuses to shrink below its
+     content, so `min-w-0` is what stops a long word widening a column. */
+  --spacing-0: 0px;
+
+  --spacing-1: 4px; /* icon to its label */
+  --spacing-2: 8px; /* between elements of one thing */
+  --spacing-3: 12px; /* inside a control */
+  --spacing-4: 16px; /* inside a group, between related lines */
+  --spacing-6: 24px; /* between fields, between blocks */
+  --spacing-8: 32px; /* between groups */
+  --spacing-10: 40px; /* heading to the body it introduces */
+  --spacing-12: 48px; /* between regions */
+  --spacing-16: 64px; /* the indent a column sits at */
+  --spacing-24: 96px; /* the margin of a page */
+
+  /* ─── radius ────────────────────────────────────────────────────────────
+     Nearly square. A 12px corner is a card, and this interface has no cards —
+     the three steps here are for the small marks that would look broken with a
+     sharp corner, not for surfaces. */
+  --radius-*: initial;
+
+  --radius-sm: 2px; /* chip, tag, the tint behind a figure */
+  --radius-md: 4px; /* button, code block */
+  --radius-lg: 8px; /* dialog, the one surface that floats */
+
+  /* ─── type ──────────────────────────────────────────────────────────────
+     Seven sizes, each with the leading it wants: a 36px heading at the body's
+     1.65 is a heading with a hole in it. `micro` is the mono, upper-cased,
+     wide-tracked label this direction uses instead of a bold sans one.
+     Numbers use tabular figures everywhere via `.fin-num`, so a value never
+     changes width as it changes. */
+  --text-*: initial;
+
+  --text-micro: 0.6875rem; /* 11px — mono label, meta, the verified badge */
+  --text-micro--line-height: 1.4;
+  --text-caption: 0.75rem; /* 12px — table meta */
+  --text-caption--line-height: 1.45;
+  --text-body-sm: 0.875rem; /* 14px — controls, tables */
+  --text-body-sm--line-height: 1.5;
+  --text-body: 1rem; /* 16px — prose, and what an answer is read at */
+  --text-body--line-height: 1.65;
+  --text-heading-sm: 1.375rem; /* 22px — the question above an answer */
+  --text-heading-sm--line-height: 1.35;
+  --text-heading: 1.75rem; /* 28px */
+  --text-heading--line-height: 1.25;
+  --text-display: 2.25rem; /* 36px — the one heading on a screen */
+  --text-display--line-height: 1.1;
+
+  /* ─── weight ────────────────────────────────────────────────────────────
+     `book` is what makes a 36px heading editorial rather than loud. Inter is a
+     variable font, so 450 costs nothing that 400 or 500 does not. */
+  --font-weight-*: initial;
+
+  --font-weight-normal: 400;
+  --font-weight-book: 450;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* ─── tracking ──────────────────────────────────────────────────────────
+     Large type needs less space between letters and small upper-case type needs
+     more. Both are here so neither is guessed at a call site. */
+  --tracking-*: initial;
+
+  --tracking-tight: -0.032em; /* display */
+  --tracking-snug: -0.022em; /* heading */
+  --tracking-wide: 0.1em; /* the mono upper-case label */
+
+  /* ─── measure ───────────────────────────────────────────────────────────
+     How wide a region is allowed to be. Closed like the rest, because
+     `max-w-3xl` versus `max-w-2xl` is a decision about how long a line gets
+     before it is tiring to read, and that decision belongs here rather than at
+     whichever call site was written last. */
+  --container-*: initial;
+
+  --container-rail: 256px; /* the list beside the conversation */
+  --container-form: 384px; /* a column of fields */
+  --container-measure: 672px; /* a line of prose at a length that stays readable */
+
+  /* ─── depth ─────────────────────────────────────────────────────────────
+     Deliberately empty. Closing the scale with nothing in it removes every
+     `shadow-*` utility, so depth is not something a component can reach for:
+     one surface is distinguished from another by a rule and by space. The one
+     thing that will genuinely float — a dialog — adds its own shadow in the
+     slice that introduces it, and has to justify it there. */
+  --shadow-*: initial;
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+/*
+ * Dark is an override of the same names. `ink` inverts: the primary action is
+ * the lightest thing on a dark page, exactly as it is the darkest on a light
+ * one, so "primary" stays one idea instead of two.
+ */
+[data-theme='dark'] {
+  --color-surface: oklch(0.145 0.006 250);
+  --color-panel: oklch(0.125 0.005 250);
+  --color-raised: oklch(0.21 0.008 250);
+
+  --color-line: oklch(0.27 0.009 250);
+  --color-line-strong: oklch(0.53 0.014 250);
+
+  --color-text: oklch(0.945 0.003 250);
+  --color-muted: oklch(0.685 0.011 250);
+
+  --color-ink: oklch(0.945 0.003 250);
+  --color-on-ink: oklch(0.16 0.008 250);
+
+  --color-verified: oklch(0.78 0.13 168);
+  --color-verified-soft: oklch(0.245 0.045 168);
+
+  --color-negative: oklch(0.73 0.16 25);
+  --color-warning: oklch(0.82 0.13 70);
+  --color-positive: oklch(0.78 0.13 155);
+}
+
+@layer base {
+  html {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+  }
+
+  body {
+    margin: 0;
+    font-size: var(--text-body);
+    line-height: 1.65;
+  }
+
+  /*
+   * One focus ring, defined once, in ink rather than in the accent: the
+   * saturated hue means "verified", and a focus ring is not a claim about a
+   * number. Anything that removes this has to say why.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-verified-soft);
+    color: var(--color-text);
+  }
+}
+
+/* Financial figures never change width as they change value. */
+@utility fin-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

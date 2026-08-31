@@ -24,14 +24,11 @@ const FRAMEWORKS = [
 const TEST_CODE = '[.](spec|test)[.]tsx?$|(^|/)__tests__/';
 
 /**
- * apps/web is feature-sliced: shared → entities → features/widgets → pages → app.
- * Listed outermost first so a slice may only name the ones after it.
+ * apps/web is grouped by business domain rather than by kind of file. A domain
+ * owns its api, hooks, components and helpers, and exposes one index; screens
+ * are composed in pages and routes. The rules below say that in the only place
+ * a rule survives, which is a config that fails the build.
  */
-const WEB_LAYERS = ['app', 'pages', 'widgets', 'features', 'entities', 'shared'];
-
-/** Everything a layer sits below, as an alternation for a path pattern. */
-const above = (layer) => WEB_LAYERS.slice(0, WEB_LAYERS.indexOf(layer)).join('|');
-
 /**
  * Matches a module resolved into node_modules and one that is not installed at all —
  * otherwise the rule would only start working after someone had added the package.
@@ -88,24 +85,65 @@ module.exports = {
         pathNot: '^apps/api/src/$1/',
       },
     },
-    ...WEB_LAYERS.slice(1).map((layer) => ({
-      name: `web-layer-${layer}-inward`,
-      severity: 'error',
-      comment:
-        `apps/web/src/${layer} may not import from a layer above it. Feature-sliced layers ` +
-        'only mean anything while the arrows point one way; the first upward import turns ' +
-        'the whole tree back into a folder listing.',
-      from: { path: `^apps/web/src/${layer}/` },
-      to: { path: `^apps/web/src/(${above(layer)})/` },
-    })),
     {
-      name: 'web-no-cross-slice',
+      name: 'web-domain-public-api',
       severity: 'error',
       comment:
-        'Two slices in the same layer are siblings, not dependencies. Whatever both need ' +
-        'belongs in shared; importing across makes one impossible to delete.',
-      from: { path: '^apps/web/src/(entities|features|widgets|pages)/([^/]+)/' },
-      to: { path: '^apps/web/src/$1/', pathNot: '^apps/web/src/$1/$2/' },
+        'A domain is reached through its index and nothing else. Anything under api/, hooks/, ' +
+        'components/ or utils/ is internal, and a deep import makes renaming one of those files ' +
+        "another domain's problem.",
+      from: { path: '^apps/web/src/domains/([^/]+)/' },
+      to: {
+        path: '^apps/web/src/domains/(?!$1/)[^/]+/',
+        pathNot: '^apps/web/src/domains/[^/]+/index[.]ts$',
+      },
+    },
+    {
+      name: 'web-domain-public-api-from-outside',
+      severity: 'error',
+      comment: 'The same rule for everything that is not itself a domain.',
+      from: { path: '^apps/web/src/', pathNot: '^apps/web/src/domains/' },
+      to: {
+        path: '^apps/web/src/domains/[^/]+/',
+        pathNot: '^apps/web/src/domains/[^/]+/index[.]ts$',
+      },
+    },
+    {
+      name: 'web-dumb-components',
+      severity: 'error',
+      comment:
+        'src/components holds components that take props and nothing else. One that fetches or ' +
+        'reads a cache cannot be rendered in isolation, and a shared component that cannot be ' +
+        'rendered in isolation is not shared.',
+      from: { path: '^apps/web/src/components/' },
+      to: {
+        path:
+          '^apps/web/src/(domains|lib/api)/|' +
+          asModulePattern(['@tanstack/react-query', 'react-router']),
+      },
+    },
+    {
+      name: 'web-composition-flows-one-way',
+      severity: 'error',
+      comment:
+        'Domains, layouts and shared code know nothing about the screens that use them. ' +
+        'Composition happens in pages and routes, which is what keeps a domain reusable.',
+      from: { path: '^apps/web/src/(domains|layouts|components|lib|utils|config)/' },
+      to: { path: '^apps/web/src/(pages|routes|app)/' },
+    },
+    {
+      name: 'web-requests-live-in-the-api-layer',
+      severity: 'error',
+      comment:
+        'A component that fetches cannot be tested without a network and cannot be cached. ' +
+        "Requests are made in lib/api or in a domain's api segment; everything else reads the " +
+        'result through a query. Listening for the session to end is not a request and lives in ' +
+        'lib/api/session-expiry, which anything may import.',
+      from: {
+        path: '^apps/web/src/',
+        pathNot: '^apps/web/src/(lib/api/|domains/[^/]+/api/)',
+      },
+      to: { path: '^apps/web/src/lib/api/(client|http)' },
     },
     {
       name: 'no-circular',
@@ -166,7 +204,10 @@ module.exports = {
     exclude: { path: '(^|/)(dist|coverage)/|(^|/)tools/architecture/fixtures/' },
     // Without this an `import type` is invisible and can smuggle a forbidden dependency.
     tsPreCompilationDeps: true,
-    tsConfig: { fileName: 'tsconfig.base.json' },
+    // Carries the web client's `@/` mapping. Without it the rules above see an
+    // unresolved specifier and stop applying — a boundary rule reporting success
+    // because it found nothing to judge.
+    tsConfig: { fileName: 'tsconfig.depcruise.json' },
     enhancedResolveOptions: {
       exportsFields: ['exports'],
       conditionNames: ['require', 'import', 'browser', 'node', 'types', 'default'],

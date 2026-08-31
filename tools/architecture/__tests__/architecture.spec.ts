@@ -106,26 +106,34 @@ describe('the boundary rules fire on a tree that breaks them', () => {
     expect(offending?.to).toBe('apps/api/src/generation/application/start.ts');
   });
 
-  it('catches a shared module in the web client reaching up into a feature', () => {
-    expect(violated).toContain('web-layer-shared-inward');
+  it("catches one domain reaching past another domain's index", () => {
+    expect(violated).toContain('web-domain-public-api');
 
-    const offending = violations.find((v) => v.rule.name === 'web-layer-shared-inward');
-    expect(offending?.from).toBe('apps/web/src/shared/Panel.tsx');
+    const offending = violations.find((v) => v.rule.name === 'web-domain-public-api');
+    expect(offending?.from).toBe('apps/web/src/domains/billing/Invoice.tsx');
     // A .tsx that resolves is the point: without the extension in the resolver
     // this dependency is invisible and the rule silently passes.
-    expect(offending?.to).toBe('apps/web/src/features/composer/Composer.tsx');
+    expect(offending?.to).toBe('apps/web/src/domains/auth/hooks/useSession.ts');
   });
 
-  it('catches one slice of the web client importing a sibling slice', () => {
-    expect(violated).toContain('web-no-cross-slice');
+  it('catches a screen reaching past a domain index as well', () => {
+    expect(violated).toContain('web-domain-public-api-from-outside');
+  });
 
-    const offending = violations.find((v) => v.rule.name === 'web-no-cross-slice');
-    expect(offending?.from).toBe('apps/web/src/entities/session/model.ts');
-    expect(offending?.to).toBe('apps/web/src/entities/user/model.ts');
+  it('catches a shared component that fetches', () => {
+    expect(violated).toContain('web-dumb-components');
+    expect(violated).toContain('web-requests-live-in-the-api-layer');
+
+    const offending = violations.find((v) => v.rule.name === 'web-dumb-components');
+    expect(offending?.from).toBe('apps/web/src/components/UsageMeter.tsx');
+  });
+
+  it('catches shared code reaching into a screen', () => {
+    expect(violated).toContain('web-composition-flows-one-way');
   });
 
   it('reports every violation, not just the first', () => {
-    expect(violated.size).toBeGreaterThanOrEqual(8);
+    expect(violated.size).toBeGreaterThanOrEqual(10);
   });
 });
 

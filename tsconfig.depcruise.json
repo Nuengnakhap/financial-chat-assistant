@@ -1,0 +1,10 @@
+{
+  // Read only by dependency-cruiser, which needs the web client's `@/` mapping to
+  // resolve an import before a rule can judge it. It is not in `tsconfig.base.json`
+  // because every package extends that one, and none of the others should be able
+  // to name a module inside apps/web at all.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "paths": { "@/*": ["./apps/web/src/*"] }
+  }
+}

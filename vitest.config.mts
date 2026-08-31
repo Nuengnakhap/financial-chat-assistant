@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -51,6 +53,18 @@ export default defineConfig({
         // is component logic, and a Playwright run is what covers the browser.
         // JSX needs no plugin here — `jsx: react-jsx` in the nearest tsconfig is
         // what the default transform reads, the same way apps/api gets decorators.
+        //
+        // `@fca/contracts` resolves to its source here for one reason: that is
+        // what `apps/web` bundles, for the reasons written in its vite config.
+        // A project should test the artefact it ships, and the API — which
+        // imports the CommonJS build — keeps doing exactly that in its own
+        // project above.
+        resolve: {
+          alias: {
+            '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
+            '@fca/contracts': fileURLToPath(new URL('./packages/contracts/src', import.meta.url)),
+          },
+        },
         test: {
           name: 'web',
           root: './apps/web',
