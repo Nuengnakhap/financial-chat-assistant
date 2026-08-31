@@ -39,9 +39,10 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
 
 - Hexagonal: `presentation → application → domain`, `infrastructure → application`.
   Enforced by dependency-cruiser in CI, not by convention.
-- `apps/web` is feature-sliced, flowing one way from `app` down through `pages`,
-  `widgets`, `features`, `entities` to `shared`, and no slice imports a sibling
-  in its own layer. Same enforcement, same fixtures.
+- `apps/web` is domain-driven: a capability lives in `domains/<name>` and is
+  entered only through its `index.ts`, one domain never imports another's
+  internals, and `components/` is presentational — anything that fetches or
+  reads session state belongs to a domain. Same enforcement, same fixtures.
 - `packages/domain`, `packages/contracts`, `packages/grounding`, `packages/config`
   are framework-free: no NestJS, Drizzle, pg, ioredis, React imports there.
 - Every HTTP body and SSE event is defined once in `packages/contracts` and

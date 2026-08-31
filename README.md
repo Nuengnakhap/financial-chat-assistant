@@ -122,9 +122,10 @@ AGENTS.md            Operating rules for AI assistants working in this repositor
 
 `packages/*` are framework-free: no NestJS, Drizzle, `pg`, `ioredis`, React or
 Fastify may be imported there; inside `apps/api` a layer may only depend inwards
-(`presentation → application → domain`); and inside `apps/web` a feature-sliced
-layer may only depend downwards (`app → pages → widgets → features → entities →
-shared`), with no slice importing a sibling. All three live in
+(`presentation → application → domain`); and inside `apps/web` a capability is
+reached only through `domains/<name>/index.ts`, never sideways into another
+domain and never past the entrance into a file that was meant to stay
+internal. All three live in
 `.dependency-cruiser.cjs` and fail `pnpm lint`, because an architecture that is
 only written down in a README is one convenient import away from being untrue.
 
