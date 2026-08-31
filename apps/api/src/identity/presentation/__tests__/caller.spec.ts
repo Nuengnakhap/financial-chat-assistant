@@ -18,26 +18,59 @@ const request = (headers: Record<string, string | undefined>, ip = '203.0.113.7'
   ({ headers, ip }) as unknown as FastifyRequest;
 
 describe('describing the caller', () => {
-  it('takes the device from the user agent', () => {
-    expect(callerFrom(request({ 'user-agent': 'Firefox on macOS' })).device).toBe(
-      'Firefox on macOS',
-    );
+  it.each([
+    [
+      'Chrome on macOS',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36',
+    ],
+    [
+      'Safari on iPhone',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1',
+    ],
+    [
+      'Firefox on Windows',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0',
+    ],
+    [
+      'Edge on Windows',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0',
+    ],
+    [
+      'Chrome on iPhone',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/152.0.0.0 Mobile/15E148 Safari/604.1',
+    ],
+    [
+      'Firefox on iPhone',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/133.0 Mobile/15E148 Safari/605.1.15',
+    ],
+  ])('names the browser and the system as "%s"', (expected, agent) => {
+    // Edge says it is Chrome and Safari as well, and Chrome says it is Safari.
+    // Every browser on iOS has to render with WebKit, so Chrome and Firefox
+    // there say Safari too and are told apart only by CriOS/FxiOS. Reading the
+    // list in order is what stops all five being called Safari.
+    expect(callerFrom(request({ 'user-agent': agent })).device).toBe(expected);
+  });
+
+  it('keeps the system when the browser is one it has never heard of', () => {
+    expect(callerFrom(request({ 'user-agent': 'SomeBot/1.0 (Linux)' })).device).toBe('Linux');
   });
 
   it.each([
     ['no user agent at all', {}],
     ['an empty one', { 'user-agent': '' }],
-    ['one that is only whitespace', { 'user-agent': '   ' }],
+    ['one it recognises nothing in', { 'user-agent': 'curl/8.7.1' }],
   ])('falls back to a placeholder for %s', (_name, headers) => {
     // `chk_sessions_device_length` refuses a blank device, so this is what
     // stops a missing header from failing the insert.
     expect(callerFrom(request(headers)).device).toBe('Unknown device');
   });
 
-  it('truncates a device name to what the column accepts', () => {
-    const caller = callerFrom(request({ 'user-agent': 'x'.repeat(500) }));
+  it('cannot be made to store a header of any length', () => {
+    // The label comes from a fixed table, so an attacker-controlled header has
+    // no way to reach `chk_sessions_device_length` at all.
+    const caller = callerFrom(request({ 'user-agent': `${'x'.repeat(5_000)} Firefox/1.0` }));
 
-    expect(caller.device).toHaveLength(200);
+    expect(caller.device).toBe('Firefox');
   });
 
   it('hashes the address and never carries it', () => {
