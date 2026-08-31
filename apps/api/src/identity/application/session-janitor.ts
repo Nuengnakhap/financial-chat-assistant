@@ -2,6 +2,7 @@ import { Injectable, type OnApplicationBootstrap } from '@nestjs/common';
 
 import { PurgeDeadSessionsUseCase } from './use-cases/purge-dead-sessions.use-case';
 import { TaskRegistry } from '../../bootstrap/task-registry';
+import { sleepUnlessCancelled } from '../../shared/async/timeouts';
 import { AppLogger, asError } from '../../shared/observability/app-logger';
 
 /** Often enough that neither table drifts far, rare enough to be invisible. */
@@ -33,7 +34,7 @@ export class SessionJanitor implements OnApplicationBootstrap {
        schedule rather than an accident. */
     while (!signal.aborted) {
       await this.sweep();
-      if (!(await sleep(intervalMs, signal))) return;
+      if (!(await sleepUnlessCancelled(intervalMs, signal))) return;
     }
     /* eslint-enable no-await-in-loop */
   }
@@ -46,24 +47,4 @@ export class SessionJanitor implements OnApplicationBootstrap {
       this.logger.error('session sweep failed', { task: 'session-janitor', err: asError(error) });
     }
   }
-}
-
-/** False once cancelled, so the caller stops rather than sleeping through shutdown. */
-async function sleep(ms: number, signal: AbortSignal): Promise<boolean> {
-  if (signal.aborted) return false;
-
-  return await new Promise<boolean>((resolve) => {
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort);
-      resolve(true);
-    }, ms);
-    // Unref so a sleeping janitor is never the reason the process stays alive.
-    timer.unref();
-
-    function onAbort(): void {
-      clearTimeout(timer);
-      resolve(false);
-    }
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
 }

@@ -62,3 +62,28 @@ export async function settledWithin(work: Promise<unknown>, timeoutMs: number): 
 export function delay(ms: number): Promise<void> {
   return alarm(ms).rings;
 }
+
+/**
+ * Waits, unless cancellation arrives first — `false` means the caller was told
+ * to stop and should not carry on round its loop. Every recurring task here
+ * sleeps through this rather than through a bare `setTimeout`, so shutdown
+ * never has to wait out an interval, and the timer is unreffed so a sleeping
+ * task is never the reason the process stays alive.
+ */
+export async function sleepUnlessCancelled(ms: number, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return false;
+
+  return await new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve(true);
+    }, ms);
+    timer.unref();
+
+    function onAbort(): void {
+      clearTimeout(timer);
+      resolve(false);
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
