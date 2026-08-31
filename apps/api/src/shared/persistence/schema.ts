@@ -25,6 +25,22 @@ import {
  * dependency-cruiser fails the build if a business rule reaches for it.
  */
 
+/**
+ * Every instant is stored to the millisecond, not to PostgreSQL's default
+ * microsecond, because a JavaScript `Date` holds milliseconds and so does the
+ * ISO string every one of these columns leaves as. Storing more precision than
+ * anything that reads them can represent means a value read out and used again
+ * is not the value stored — which is not academic: a keyset cursor built from
+ * `updated_at` compared against a microsecond column silently steps over any
+ * row that shares the millisecond it was truncated to, and the page after it
+ * simply loses a conversation.
+ *
+ * Rounding on the way in is PostgreSQL's, so the stored value and the one the
+ * application read back are the same instant, and the tie between two rows in
+ * the same millisecond is broken by the id already in every ordering.
+ */
+const instant = (name: string) => timestamp(name, { withTimezone: true, precision: 3 });
+
 export const users = pgTable(
   'users',
   {
@@ -32,7 +48,7 @@ export const users = pgTable(
     email: text().notNull(),
     displayName: text('display_name').notNull(),
     passwordHash: text('password_hash').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: instant('created_at').notNull().defaultNow(),
   },
   (table) => [
     // Case-insensitive: signing up as Ada@x.com and ada@x.com must not be two people.
@@ -60,12 +76,12 @@ export const sessions = pgTable(
     device: text().notNull(),
     /** A hash, not an address: the session list shows it, so it must not be one. */
     ipHash: text('ip_hash').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: instant('created_at').notNull().defaultNow(),
+    lastUsedAt: instant('last_used_at').notNull().defaultNow(),
+    expiresAt: instant('expires_at').notNull(),
     /** Refreshing slides `expires_at` forward; nothing slides past this. */
-    absoluteExpiresAt: timestamp('absolute_expires_at', { withTimezone: true }).notNull(),
-    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    absoluteExpiresAt: instant('absolute_expires_at').notNull(),
+    revokedAt: instant('revoked_at'),
   },
   (table) => [
     // S1: a family is a chain, so only one link of it can be live at a time.
@@ -104,8 +120,8 @@ export const sessionTokens = pgTable(
     sessionId: uuid('session_id')
       .notNull()
       .references(() => sessions.id, { onDelete: 'cascade' }),
-    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
-    supersededAt: timestamp('superseded_at', { withTimezone: true }),
+    issuedAt: instant('issued_at').notNull().defaultNow(),
+    supersededAt: instant('superseded_at'),
   },
   (table) => [
     // S3: one token per session is usable; the rest are history.
@@ -136,8 +152,8 @@ export const conversations = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     title: text().notNull(),
     state: conversationState().notNull().default('active'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: instant('created_at').notNull().defaultNow(),
+    updatedAt: instant('updated_at').notNull().defaultNow(),
   },
   (table) => [
     // C2: a title is never blank and never unbounded.
@@ -180,7 +196,7 @@ export const messages = pgTable(
       .notNull()
       .default(sql`0`),
     seq: integer().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: instant('created_at').notNull().defaultNow(),
   },
   (table) => [
     // M1: ordering within a conversation is unique, so a page can never repeat
@@ -223,8 +239,8 @@ export const outboxEvents = pgTable(
     aggregateId: uuid('aggregate_id').notNull(),
     type: text().notNull(),
     payload: jsonb().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    publishedAt: timestamp('published_at', { withTimezone: true }),
+    createdAt: instant('created_at').notNull().defaultNow(),
+    publishedAt: instant('published_at'),
   },
   (table) => [
     // The relay reads this column back and hands it to consumers as a

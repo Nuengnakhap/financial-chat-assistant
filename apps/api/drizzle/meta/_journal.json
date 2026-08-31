@@ -29,6 +29,13 @@
       "when": 1788071891349,
       "tag": "0003_session_absolute_lifetime",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788140043711,
+      "tag": "0004_millisecond_instants",
+      "breakpoints": true
     }
   ]
 }
