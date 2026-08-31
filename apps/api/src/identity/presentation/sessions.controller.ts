@@ -3,8 +3,8 @@ import { Controller, Delete, Get, HttpCode, Param, Res, UseGuards } from '@nestj
 import type { FastifyReply } from 'fastify';
 
 import { SessionCookies } from './session-cookies';
-import { SessionGuard } from './session.guard';
 import { requirePrincipal } from '../../shared/http/request-context';
+import { SessionGuard } from '../../shared/http/session.guard';
 import type { ListedSession } from '../application/use-cases/list-sessions.use-case';
 import { ListSessionsUseCase } from '../application/use-cases/list-sessions.use-case';
 import { RevokeSessionUseCase } from '../application/use-cases/revoke-session.use-case';

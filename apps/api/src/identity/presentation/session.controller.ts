@@ -4,8 +4,8 @@ import { Controller, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common'
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { REFRESH_COOKIE, SessionCookies } from './session-cookies';
-import { SessionGuard } from './session.guard';
 import { requirePrincipal } from '../../shared/http/request-context';
+import { SessionGuard } from '../../shared/http/session.guard';
 import { RotateRefreshTokenUseCase } from '../application/use-cases/rotate-refresh-token.use-case';
 import { SignOutUseCase } from '../application/use-cases/sign-out.use-case';
 

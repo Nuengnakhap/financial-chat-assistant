@@ -2,9 +2,9 @@ import type { UserView } from '@fca/contracts';
 import { UnauthenticatedError } from '@fca/domain';
 import { Controller, Get, UseGuards } from '@nestjs/common';
 
-import { SessionGuard } from './session.guard';
 import { toUserView } from './user-view';
 import { requirePrincipal } from '../../shared/http/request-context';
+import { SessionGuard } from '../../shared/http/session.guard';
 import { DescribeUserUseCase } from '../application/use-cases/describe-user.use-case';
 
 @Controller()

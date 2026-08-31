@@ -17,6 +17,7 @@ import { createFastifyAdapter } from '../../../bootstrap/fastify';
 import { testConfig } from '../../../shared/config/__tests__/test-config';
 import { APP_CONFIG } from '../../../shared/config/app-config.token';
 import { DomainErrorFilter } from '../../../shared/http/domain-error.filter';
+import { ACCESS_TOKEN_VERIFIER, SessionGuard } from '../../../shared/http/session.guard';
 import { AppLogger, createPinoLogger } from '../../../shared/observability/app-logger';
 import { storedUser } from '../../application/__tests__/fakes';
 import { TOKEN_ISSUER } from '../../application/ports/token-issuer';
@@ -30,7 +31,6 @@ import { CurrentUserController } from '../current-user.controller';
 import { RegistrationController } from '../registration.controller';
 import { SessionCookies } from '../session-cookies';
 import { SessionController } from '../session.controller';
-import { SessionGuard } from '../session.guard';
 
 const USER = storedUser();
 const SESSION = {
@@ -65,6 +65,7 @@ const verifyAccessToken = vi.fn();
     { provide: SignOutUseCase, useValue: signOut },
     { provide: DescribeUserUseCase, useValue: describeUser },
     { provide: TOKEN_ISSUER, useValue: { verifyAccessToken } },
+    { provide: ACCESS_TOKEN_VERIFIER, useValue: { verifyAccessToken } },
     SessionCookies,
     SessionGuard,
     { provide: APP_GUARD, useClass: CsrfGuard },

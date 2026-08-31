@@ -31,8 +31,8 @@ import { CurrentUserController } from './presentation/current-user.controller';
 import { RegistrationController } from './presentation/registration.controller';
 import { SessionCookies } from './presentation/session-cookies';
 import { SessionController } from './presentation/session.controller';
-import { SessionGuard } from './presentation/session.guard';
 import { SessionsController } from './presentation/sessions.controller';
+import { ACCESS_TOKEN_VERIFIER, SessionGuard } from '../shared/http/session.guard';
 
 /**
  * Every binding for signing in, in one place. A use case names a port and gets
@@ -52,6 +52,10 @@ import { SessionsController } from './presentation/sessions.controller';
   providers: [
     { provide: PASSWORD_HASHER, useClass: Argon2PasswordHasher },
     { provide: TOKEN_ISSUER, useClass: FastJwtTokenIssuer },
+    // The guard asks for the narrow capability; the issuer that mints tokens is
+    // what reads them, so there is one implementation rather than two that
+    // could disagree about what a valid token is.
+    { provide: ACCESS_TOKEN_VERIFIER, useExisting: TOKEN_ISSUER },
     {
       // Read from the environment rather than fixed in the adapter, because an
       // office behind one NAT is exactly the deployment that needs them raised.
@@ -77,6 +81,16 @@ import { SessionsController } from './presentation/sessions.controller';
     // that forgets the check is the one that would not be noticed.
     { provide: APP_GUARD, useClass: CsrfGuard },
   ],
-  exports: [RegisterUserUseCase, SignInUseCase, RotateRefreshTokenUseCase, SignOutUseCase],
+  // `ACCESS_TOKEN_VERIFIER` leaves this module for one reason: `SessionGuard`
+  // is what every other context puts in front of its routes, and a guard is
+  // built in the injector of the module whose controller uses it. The issuer
+  // itself stays in — nobody else has any business minting a token.
+  exports: [
+    RegisterUserUseCase,
+    SignInUseCase,
+    RotateRefreshTokenUseCase,
+    SignOutUseCase,
+    ACCESS_TOKEN_VERIFIER,
+  ],
 })
 export class IdentityModule {}
