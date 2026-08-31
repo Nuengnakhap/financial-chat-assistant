@@ -2,15 +2,16 @@ import { randomBytes } from 'node:crypto';
 
 import type { CookieSerializeOptions } from '@fastify/cookie';
 import type { AppConfig } from '@fca/config';
+import { SESSION_COOKIE } from '@fca/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { APP_CONFIG } from '../../shared/config/app-config.token';
 import type { IssuedSession } from '../application/session-issuer';
 
-export const ACCESS_COOKIE = 'fca_access';
-export const REFRESH_COOKIE = 'fca_refresh';
-export const CSRF_COOKIE = 'fca_csrf';
+// The names live in `@fca/contracts` because the browser client reads one of
+// them and echoes it back; re-exported here so call sites keep reading locally.
+export const { access: ACCESS_COOKIE, refresh: REFRESH_COOKIE, csrf: CSRF_COOKIE } = SESSION_COOKIE;
 
 /**
  * The refresh token is only ever presented to these routes, so the browser is

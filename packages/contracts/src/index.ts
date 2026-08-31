@@ -50,6 +50,7 @@ export {
   type StreamEventType,
 } from './sse/stream-events.contract';
 
+export { CSRF_HEADER, SESSION_COOKIE } from './http/session-cookies.contract';
 export {
   apiErrorCode,
   apiFailure,

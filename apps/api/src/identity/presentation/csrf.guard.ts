@@ -1,12 +1,12 @@
 import { timingSafeEqual } from 'node:crypto';
 
+import { CSRF_HEADER } from '@fca/contracts';
 import { ForbiddenError } from '@fca/domain';
 import { Injectable, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 
 import { ACCESS_COOKIE, CSRF_COOKIE, REFRESH_COOKIE } from './session-cookies';
 
-const CSRF_HEADER = 'x-csrf-token';
 const SAFE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
