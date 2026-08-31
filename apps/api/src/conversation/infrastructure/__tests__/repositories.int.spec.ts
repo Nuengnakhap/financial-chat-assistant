@@ -33,6 +33,9 @@ beforeEach(async () => {
 
 const newId = (): ConversationId => crypto.randomUUID() as ConversationId;
 
+const listMessages = (userId: UserId, conversationId: ConversationId, limit = 10) =>
+  messagesRepo.listForConversation({ userId }, { conversationId, limit, cursor: null });
+
 describe('one user cannot reach another user data', () => {
   it('hides a conversation that is not yours', async () => {
     const id = await insertConversation(h.db, ada);
@@ -48,9 +51,9 @@ describe('one user cannot reach another user data', () => {
     await insertConversation(h.db, ada, 'Ada two');
     await insertConversation(h.db, grace, 'Grace one');
 
-    const mine = await conversationsRepo.listForOwner({ userId: ada }, 10);
+    const mine = await conversationsRepo.listForOwner({ userId: ada }, { limit: 10, cursor: null });
 
-    expect(mine.map((row) => row.title).sort()).toEqual(['Ada one', 'Ada two']);
+    expect(mine.items.map((row) => row.title).sort()).toEqual(['Ada one', 'Ada two']);
   });
 
   it('hides messages in a conversation that is not yours', async () => {
@@ -63,8 +66,8 @@ describe('one user cannot reach another user data', () => {
       status: 'complete',
     });
 
-    expect(await messagesRepo.listForConversation({ userId: grace }, id, 10)).toEqual([]);
-    expect(await messagesRepo.listForConversation({ userId: ada }, id, 10)).toHaveLength(1);
+    expect((await listMessages(grace, id)).items).toEqual([]);
+    expect((await listMessages(ada, id)).items).toHaveLength(1);
   });
 
   it('refuses to delete someone else conversation', async () => {
@@ -137,8 +140,8 @@ describe('appending a message', () => {
     const rejected = results.filter((result) => result.status === 'rejected');
     expect(rejected).toHaveLength(0);
 
-    const stored = await messagesRepo.listForConversation({ userId: ada }, id, 20);
-    expect(stored.map((message) => message.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    const stored = await listMessages(ada, id, 20);
+    expect(stored.items.map((message) => message.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it('still reports a duplicate client id rather than retrying it away', async () => {
@@ -179,9 +182,9 @@ describe('appending a message', () => {
       .insert(messages)
       .values({ conversationId: id, role: 'assistant', parts: {}, status: 'stopped', seq: 1 });
 
-    const stored = await messagesRepo.listForConversation({ userId: ada }, id, 10);
+    const stored = await listMessages(ada, id);
 
-    expect(stored[0]?.parts).toEqual([]);
+    expect(stored.items[0]?.parts).toEqual([]);
   });
 
   it('reads messages back in the order they were sent', async () => {
@@ -190,8 +193,8 @@ describe('appending a message', () => {
     await append(id, 'second');
     await append(id, 'third');
 
-    const stored = await messagesRepo.listForConversation({ userId: ada }, id, 10);
+    const stored = await listMessages(ada, id);
 
-    expect(stored.map((message) => message.seq)).toEqual([1, 2, 3]);
+    expect(stored.items.map((message) => message.seq)).toEqual([1, 2, 3]);
   });
 });

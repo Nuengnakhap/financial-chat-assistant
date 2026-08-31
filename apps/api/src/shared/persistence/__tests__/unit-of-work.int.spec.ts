@@ -181,10 +181,13 @@ describe('repositories inside the transaction', () => {
         parts: [{ kind: 'text', text: 'hello' }],
         status: 'complete',
       });
-      return await ctx.messages.listForConversation({ userId }, id, 10);
+      return await ctx.messages.listForConversation(
+        { userId },
+        { conversationId: id, limit: 10, cursor: null },
+      );
     });
 
-    expect(seen).toHaveLength(1);
+    expect(seen.items).toHaveLength(1);
     expect(await h.db.select().from(messages)).toHaveLength(1);
   });
 });

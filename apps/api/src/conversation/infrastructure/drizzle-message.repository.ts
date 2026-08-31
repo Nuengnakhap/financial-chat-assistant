@@ -1,11 +1,13 @@
 import type { ConversationId, MessageId, MessageStatus, OwnerScope } from '@fca/domain';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, sql } from 'drizzle-orm';
 
 import type { DbOrTx } from '../../shared/persistence/db-or-tx';
 import { isUniqueViolationOf } from '../../shared/persistence/pg-errors';
 import { conversations, messages } from '../../shared/persistence/schema';
+import { pageOf, type MessageCursor, type Page } from '../application/pagination';
 import type {
   AppendMessage,
+  MessagePageRequest,
   MessageRepository,
   StoredMessage,
 } from '../application/ports/message.repository';
@@ -77,23 +79,41 @@ export class DrizzleMessageRepository implements MessageRepository {
 
   async listForConversation(
     scope: OwnerScope,
-    conversationId: ConversationId,
-    limit: number,
-  ): Promise<readonly StoredMessage[]> {
-    // Joined rather than checked in two queries: ownership and selection are one
-    // predicate, so there is no window between them and no second round trip.
-    const rows = await this.db
+    request: MessagePageRequest,
+  ): Promise<Page<StoredMessage, MessageCursor>> {
+    const rows = await messagePageQuery(this.db, scope, request);
+
+    // The query reads newest first, because that is the end a conversation is
+    // opened at and the direction paging moves. `pageOf` therefore takes the
+    // cursor from the oldest row kept — and only then is the page turned round,
+    // so what a caller receives reads downwards like a transcript.
+    const page = pageOf(rows.map(toStored), request, (row) => ({ seq: row.seq }));
+
+    return { items: [...page.items].reverse(), nextCursor: page.nextCursor };
+  }
+}
+
+/** Exported for the same reason as `conversationPageQuery`: the plan is a test. */
+export function messagePageQuery(db: DbOrTx, scope: OwnerScope, request: MessagePageRequest) {
+  return (
+    db
       .select(COLUMNS)
       .from(messages)
+      // Joined rather than checked in two queries: ownership and selection are
+      // one predicate, so there is no window between them and no second round
+      // trip. A conversation being deleted answers as one that never existed.
       .innerJoin(conversations, eq(conversations.id, messages.conversationId))
       .where(
-        and(eq(messages.conversationId, conversationId), eq(conversations.userId, scope.userId)),
+        and(
+          eq(messages.conversationId, request.conversationId),
+          eq(conversations.userId, scope.userId),
+          eq(conversations.state, 'active'),
+          request.cursor === null ? undefined : lt(messages.seq, request.cursor.seq),
+        ),
       )
-      .orderBy(asc(messages.seq))
-      .limit(limit);
-
-    return rows.map(toStored);
-  }
+      .orderBy(desc(messages.seq))
+      .limit(request.limit + 1)
+  );
 }
 
 function toStored(row: MessageColumns): StoredMessage {

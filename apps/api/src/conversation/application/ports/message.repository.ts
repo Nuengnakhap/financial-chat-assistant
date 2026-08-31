@@ -6,6 +6,12 @@ import type {
   OwnerScope,
 } from '@fca/domain';
 
+import type { MessageCursor, Page, PageRequest } from '../pagination';
+
+export interface MessagePageRequest extends PageRequest<MessageCursor> {
+  readonly conversationId: ConversationId;
+}
+
 export interface AppendMessage {
   readonly conversationId: ConversationId;
   readonly clientMessageId: ClientMessageId | null;
@@ -31,9 +37,14 @@ export interface MessageRepository {
    * between simultaneous sends is whatever the database settles on.
    */
   append(message: AppendMessage): Promise<StoredMessage>;
+  /**
+   * A conversation is read from its end: the first page is the newest messages,
+   * and paging moves backwards through older ones — which is the direction
+   * someone scrolls. Within a page the items are in reading order, oldest
+   * first, so a caller never has to know that.
+   */
   listForConversation(
     scope: OwnerScope,
-    conversationId: ConversationId,
-    limit: number,
-  ): Promise<readonly StoredMessage[]>;
+    request: MessagePageRequest,
+  ): Promise<Page<StoredMessage, MessageCursor>>;
 }

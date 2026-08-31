@@ -36,7 +36,7 @@ in `tools/architecture/` that prove the rules fire. Anything two contexts need
 to say the same way, such as `OwnerScope`, lives in `@fca/domain` rather than in
 whichever one happened to need it first.
 
-## Five rules this package exists to hold
+## The rules this package exists to hold
 
 **Nothing about how the server is built reaches a caller.** `DomainErrorFilter`
 answers with the status a code implies and wording written for a person. Both
@@ -77,6 +77,29 @@ Every invariant the domain states is also a database constraint — `UNIQUE`,
 `CHECK`, a partial unique index — because application code is the layer most
 likely to have the bug. `src/shared/persistence/__tests__/constraints.int.spec.ts`
 watches each one reject what it claims to.
+
+**A list is read by keyset, never by offset.** `OFFSET n` reads n rows in order
+to throw them away, and the rows move underneath whoever is reading: a
+conversation created between two pages shifts every later position by one, so
+one row is served twice and its neighbour never. A page asks the database for
+one row more than it returns, which makes "there is another page" a row that
+exists rather than a guess from `items.length` — a guess that is wrong exactly
+when the last page is full. The cursor is opaque and carries a position, not a
+permission; the owner still comes from the session, and a tampered one is a
+`validation` failure. It is checked by parsing what came _out_ of the decode,
+because `Buffer.from(raw, 'base64url')` does not reject input that is not
+base64: it drops the characters it cannot read and returns the rest, so a
+`catch` around the decode would be a branch that can never run while the
+malformed value walks on into the query.
+
+Every instant is stored to the millisecond rather than PostgreSQL's default
+microsecond, for the same reason. A JavaScript `Date` holds milliseconds and so
+does the ISO string these columns leave as, so a column carrying more precision
+than anything that reads it can represent means a cursor built from a value read
+back is not the value stored — and the page after it steps over every row that
+shared the truncated millisecond. `keyset.int.spec.ts` also reads the query plan
+of the statement the repository actually runs, so an index that stops serving
+the list fails a test rather than turning up as slowness months later.
 
 A refresh token is a row in `session_tokens` keyed by its own hash, not a column
 on `sessions`. That is what makes "no two sessions ever answer to one token" a
