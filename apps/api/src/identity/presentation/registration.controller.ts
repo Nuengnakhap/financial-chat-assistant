@@ -6,13 +6,13 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { callerFrom } from './caller';
 import { SessionCookies } from './session-cookies';
 import { toUserView } from './user-view';
-import { ZodBody } from '../../shared/http/zod-body.pipe';
+import { ZodPayload } from '../../shared/http/zod-payload.pipe';
 import type { AuthResult } from '../application/use-cases/register-user.use-case';
 import { RegisterUserUseCase } from '../application/use-cases/register-user.use-case';
 import { SignInUseCase } from '../application/use-cases/sign-in.use-case';
 
-const REGISTER = new ZodBody(authContract.register.body);
-const LOGIN = new ZodBody(authContract.login.body);
+const REGISTER = new ZodPayload(authContract.register.body);
+const LOGIN = new ZodPayload(authContract.login.body);
 
 /**
  * The two ways a session begins. Paths and shapes come from `@fca/contracts`,
