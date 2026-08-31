@@ -1,5 +1,6 @@
 import fastifyCookie from '@fastify/cookie';
 import type { AppConfig } from '@fca/config';
+import { CSRF_HEADER, SESSION_COOKIE } from '@fca/contracts';
 import { Global, Module } from '@nestjs/common';
 import { APP_FILTER, NestFactory } from '@nestjs/core';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -7,6 +8,7 @@ import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { Redis } from 'ioredis';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { CookieJar } from '../../../__tests__/cookie-jar';
 import { createFastifyAdapter } from '../../../bootstrap/fastify';
 import { TaskRegistry } from '../../../bootstrap/task-registry';
 import { testConfig } from '../../../shared/config/__tests__/test-config';
@@ -89,38 +91,11 @@ beforeEach(async () => {
   await Promise.all([harness.reset(), redis.flushall()]);
 });
 
-/** Keeps whatever the server last set, the way a browser would. */
-class Jar {
-  private readonly values = new Map<string, string>();
-
-  absorb(header: string | string[] | undefined): void {
-    const all = header === undefined ? [] : Array.isArray(header) ? header : [header];
-    for (const cookie of all) {
-      const [pair] = cookie.split(';');
-      const separator = pair?.indexOf('=') ?? -1;
-      if (pair === undefined || separator < 0) continue;
-      const name = pair.slice(0, separator);
-      const value = pair.slice(separator + 1);
-      if (value === '') this.values.delete(name);
-      else this.values.set(name, value);
-    }
-  }
-
-  get cookies(): Record<string, string> {
-    return Object.fromEntries(this.values);
-  }
-
-  get csrf(): Record<string, string> {
-    const token = this.values.get('fca_csrf');
-    return token === undefined ? {} : { 'x-csrf-token': token };
-  }
-}
-
 interface Call {
   readonly method: 'GET' | 'POST' | 'DELETE';
   readonly url: string;
   readonly payload?: Payload;
-  readonly jar?: Jar;
+  readonly jar?: CookieJar;
 }
 
 type Payload = NonNullable<InjectOptions['payload']>;
@@ -142,7 +117,7 @@ async function call(options: Call): Promise<LightMyRequestResponse> {
   return response;
 }
 
-const signUp = async (jar: Jar, overrides: Partial<typeof CREDENTIALS> = {}) =>
+const signUp = async (jar: CookieJar, overrides: Partial<typeof CREDENTIALS> = {}) =>
   await call({
     method: 'POST',
     url: '/api/v1/auth/register',
@@ -152,7 +127,7 @@ const signUp = async (jar: Jar, overrides: Partial<typeof CREDENTIALS> = {}) =>
 
 describe('a session from end to end', () => {
   it('registers, reads itself, refreshes and signs out', async () => {
-    const jar = new Jar();
+    const jar = new CookieJar();
 
     expect((await signUp(jar)).statusCode).toBe(201);
     expect((await call({ method: 'GET', url: '/api/v1/auth/me', jar })).json()).toMatchObject({
@@ -170,7 +145,7 @@ describe('a session from end to end', () => {
   });
 
   it('refuses a refresh token that was already rotated away', async () => {
-    const jar = new Jar();
+    const jar = new CookieJar();
     await signUp(jar);
     const stolen = jar.cookies;
 
@@ -185,17 +160,17 @@ describe('a session from end to end', () => {
         method: 'POST',
         url: '/api/v1/auth/refresh',
         cookies: stolen,
-        headers: { 'x-csrf-token': stolen['fca_csrf'] ?? '' },
+        headers: { [CSRF_HEADER]: stolen[SESSION_COOKIE.csrf] ?? '' },
       } satisfies InjectOptions);
 
     expect(replay.statusCode).toBe(401);
   });
 
   it('signs in again on the same account and keeps both sessions', async () => {
-    const first = new Jar();
+    const first = new CookieJar();
     await signUp(first);
 
-    const second = new Jar();
+    const second = new CookieJar();
     const response = await call({
       method: 'POST',
       url: '/api/v1/auth/login',
@@ -214,16 +189,16 @@ describe('a session from end to end', () => {
   });
 
   it('reports a taken address without saying anything else', async () => {
-    await signUp(new Jar());
+    await signUp(new CookieJar());
 
-    const again = await signUp(new Jar());
+    const again = await signUp(new CookieJar());
 
     expect(again.statusCode).toBe(409);
     expect(again.json()).toMatchObject({ code: 'conflict' });
   });
 
   it('refuses a password that is wrong, in the same words as an unknown address', async () => {
-    await signUp(new Jar());
+    await signUp(new CookieJar());
 
     const wrongPassword = await call({
       method: 'POST',
@@ -249,9 +224,9 @@ describe('a session from end to end', () => {
   });
 
   it('one user cannot read another', async () => {
-    const ada = new Jar();
+    const ada = new CookieJar();
     await signUp(ada);
-    const grace = new Jar();
+    const grace = new CookieJar();
     await signUp(grace, { email: 'grace@example.com', displayName: 'Grace' });
 
     const mine = await call({ method: 'GET', url: '/api/v1/auth/me', jar: grace });
@@ -273,16 +248,16 @@ describe('the isolation gate', () => {
   const idsOf = (response: LightMyRequestResponse) => sessionsOf(response).map((s) => s.id);
 
   it('lists only the caller own sessions, marking the one in hand', async () => {
-    const ada = new Jar();
+    const ada = new CookieJar();
     await signUp(ada);
-    const second = new Jar();
+    const second = new CookieJar();
     await call({
       method: 'POST',
       url: '/api/v1/auth/login',
       payload: { email: CREDENTIALS.email, password: CREDENTIALS.password },
       jar: second,
     });
-    const grace = new Jar();
+    const grace = new CookieJar();
     await signUp(grace, { email: 'grace@example.com', displayName: 'Grace' });
 
     const mine = await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: ada });
@@ -296,10 +271,10 @@ describe('the isolation gate', () => {
   });
 
   it('shows another user nothing of yours, not even that it exists', async () => {
-    const ada = new Jar();
+    const ada = new CookieJar();
     await signUp(ada);
     const [target] = idsOf(await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: ada }));
-    const grace = new Jar();
+    const grace = new CookieJar();
     await signUp(grace, { email: 'grace@example.com', displayName: 'Grace' });
 
     const stolen = await call({
@@ -317,7 +292,7 @@ describe('the isolation gate', () => {
     ['an id that names nothing', '3f2504e0-4f89-41d3-9a0c-0305e82c3399'],
     ['an id that is not a uuid', 'not-a-uuid'],
   ])('answers not-found for %s, in the same words', async (_name, id) => {
-    const ada = new Jar();
+    const ada = new CookieJar();
     await signUp(ada);
 
     const response = await call({
@@ -331,9 +306,9 @@ describe('the isolation gate', () => {
   });
 
   it('ends another device of your own, and only that one', async () => {
-    const first = new Jar();
+    const first = new CookieJar();
     await signUp(first);
-    const second = new Jar();
+    const second = new CookieJar();
     await call({
       method: 'POST',
       url: '/api/v1/auth/login',
@@ -363,7 +338,7 @@ describe('the isolation gate', () => {
   });
 
   it('clears the cookies when you end the session you are asking from', async () => {
-    const jar = new Jar();
+    const jar = new CookieJar();
     await signUp(jar);
     const [mine] = sessionsOf(
       await call({ method: 'GET', url: '/api/v1/auth/sessions', jar }),
@@ -383,7 +358,7 @@ describe('the isolation gate', () => {
   });
 
   it('refuses the whole surface to a caller with no session', async () => {
-    const anonymous = new Jar();
+    const anonymous = new CookieJar();
 
     expect(
       (await call({ method: 'GET', url: '/api/v1/auth/sessions', jar: anonymous })).statusCode,
