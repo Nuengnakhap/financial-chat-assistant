@@ -15,6 +15,7 @@ import { uuid } from '../primitives';
 export const apiErrorCode = z.enum([
   'validation',
   'unauthenticated',
+  'invalid_credentials',
   'not_found',
   'conflict',
   'forbidden',

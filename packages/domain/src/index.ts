@@ -13,6 +13,7 @@ export {
   ConflictError,
   DomainError,
   ForbiddenError,
+  InvalidCredentialsError,
   InvalidTransitionError,
   NotFoundError,
   RateLimitedError,

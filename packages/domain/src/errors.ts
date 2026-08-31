@@ -8,6 +8,7 @@
 export type DomainErrorCode =
   | 'validation'
   | 'unauthenticated'
+  | 'invalid_credentials'
   | 'not_found'
   | 'conflict'
   | 'forbidden'
@@ -42,6 +43,20 @@ export class ValidationError extends DomainError {
  */
 export class UnauthenticatedError extends DomainError {
   readonly code = 'unauthenticated' as const;
+}
+
+/**
+ * The email and password presented do not identify anyone. Separate from
+ * `unauthenticated` because the two are read in opposite situations: one is
+ * someone standing at the sign-in form having mistyped, the other is a request
+ * arriving without a session. Telling a person at the form that they "need to
+ * sign in" is the wording bug this code exists to make impossible.
+ *
+ * Deliberately not split further: "no such account" and "wrong password" answer
+ * with this same code, so the response never says which.
+ */
+export class InvalidCredentialsError extends DomainError {
+  readonly code = 'invalid_credentials' as const;
 }
 
 /** The resource does not exist, or exists but is not this user's to see. */

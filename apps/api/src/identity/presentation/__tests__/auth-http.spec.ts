@@ -1,5 +1,12 @@
 import fastifyCookie from '@fastify/cookie';
-import { ConflictError, Err, Ok, RateLimitedError, UnauthenticatedError } from '@fca/domain';
+import {
+  ConflictError,
+  Err,
+  InvalidCredentialsError,
+  Ok,
+  RateLimitedError,
+  UnauthenticatedError,
+} from '@fca/domain';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, NestFactory } from '@nestjs/core';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -233,7 +240,7 @@ describe('signing in over HTTP', () => {
 
   it('tells a caller nothing about why the credentials failed', async () => {
     signIn.execute.mockResolvedValue(
-      Err(new UnauthenticatedError('Email or password is incorrect.')),
+      Err(new InvalidCredentialsError('Email or password is incorrect.')),
     );
 
     const response = await call({
@@ -243,7 +250,14 @@ describe('signing in over HTTP', () => {
     });
 
     expect(response.statusCode).toBe(401);
-    expect(response.json()).toMatchObject({ message: 'You need to sign in to do that.' });
+    // Neither field is named, and the sentence fits where it is read: someone
+    // standing at the sign-in form. `unauthenticated` answers the same status
+    // with "You need to sign in to do that.", which is advice they are already
+    // taking.
+    expect(response.json()).toMatchObject({
+      code: 'invalid_credentials',
+      message: 'Email or password is incorrect.',
+    });
   });
 });
 

@@ -1,4 +1,4 @@
-import { Err, RateLimitedError, UnauthenticatedError, isErr, isOk } from '@fca/domain';
+import { Err, InvalidCredentialsError, RateLimitedError, isErr, isOk } from '@fca/domain';
 import { describe, expect, it, vi } from 'vitest';
 
 import { testConfig } from '../../../shared/config/__tests__/test-config';
@@ -86,7 +86,10 @@ describe('signing in', () => {
 
     const result = await useCase.execute(COMMAND);
 
-    expect(isErr(result) && result.error).toBeInstanceOf(UnauthenticatedError);
+    // `invalid_credentials`, not `unauthenticated`: the two answer 401 alike but
+    // read in opposite situations, and the wording a person sees is chosen from
+    // the code. See `api-response.ts`.
+    expect(isErr(result) && result.error).toBeInstanceOf(InvalidCredentialsError);
     expect(isErr(result) && result.error.message).toBe('Email or password is incorrect.');
     // Both paths pay for a verification, so the two cannot be told apart by timing.
     expect(verify).toHaveBeenCalledOnce();

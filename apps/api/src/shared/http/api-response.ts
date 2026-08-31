@@ -15,6 +15,7 @@ export type { ApiErrorCode, ApiFailure };
 const STATUS_BY_CODE: Readonly<Record<DomainErrorCode, number>> = {
   validation: 400,
   unauthenticated: 401,
+  invalid_credentials: 401,
   forbidden: 403,
   not_found: 404,
   conflict: 409,
@@ -67,6 +68,7 @@ const MESSAGE_BY_CODE: Readonly<Record<ApiErrorCode, string>> = {
   validation: 'The request could not be understood. Check the fields and try again.',
   bad_request: 'The request could not be read. Check the size and format of what you sent.',
   unauthenticated: 'You need to sign in to do that.',
+  invalid_credentials: 'Email or password is incorrect.',
   forbidden: 'You do not have access to this.',
   not_found: 'That does not exist, or is no longer available.',
   conflict: 'That conflicts with the current state. Reload and try again.',

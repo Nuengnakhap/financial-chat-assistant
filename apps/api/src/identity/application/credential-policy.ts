@@ -1,4 +1,4 @@
-import { Err, Ok, UnauthenticatedError, type RateLimitedError, type Result } from '@fca/domain';
+import { Err, InvalidCredentialsError, Ok, type RateLimitedError, type Result } from '@fca/domain';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { AUTH_THROTTLE, type AuthThrottle } from './ports/auth-throttle';
@@ -8,10 +8,12 @@ import type { Credentials, StoredUser } from './ports/user.repository';
 /**
  * One sentence for every way this fails, because "no such account" and "wrong
  * password" are the same answer to anyone who should not be told them apart.
+ * It stays in the log; what a person reads is the wording `invalid_credentials`
+ * carries in `api-response.ts`, and the two say the same thing on purpose.
  */
 const REJECTED = 'Email or password is incorrect.';
 
-export type SignInError = UnauthenticatedError | RateLimitedError;
+export type SignInError = InvalidCredentialsError | RateLimitedError;
 
 /**
  * Everything about a credential that has to be true no matter which use case is
@@ -55,12 +57,12 @@ export class CredentialPolicy {
   async verify(
     credentials: Credentials | null,
     attempt: { readonly email: string; readonly password: string },
-  ): Promise<Result<StoredUser, UnauthenticatedError>> {
+  ): Promise<Result<StoredUser, InvalidCredentialsError>> {
     const matched = await this.passwords.verify(
       credentials?.passwordHash ?? null,
       attempt.password,
     );
-    if (credentials === null || !matched) return Err(new UnauthenticatedError(REJECTED));
+    if (credentials === null || !matched) return Err(new InvalidCredentialsError(REJECTED));
 
     await this.throttle.clearSignIn(attempt.email);
     return Ok(credentials.user);
