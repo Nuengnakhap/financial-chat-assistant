@@ -84,6 +84,18 @@ export class DrizzleConversationRepository implements ConversationRepository {
 
     return updated.length === 1;
   }
+
+  async purge(id: ConversationId): Promise<boolean> {
+    // `state = 'deleting'` is part of the predicate rather than something read
+    // first and checked: between a read and a delete the row could have changed,
+    // and there is no scope here to fall back on.
+    const removed = await this.db
+      .delete(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.state, 'deleting')))
+      .returning({ id: conversations.id });
+
+    return removed.length === 1;
+  }
 }
 
 /**

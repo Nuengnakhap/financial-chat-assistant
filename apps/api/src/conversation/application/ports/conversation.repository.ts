@@ -34,4 +34,16 @@ export interface ConversationRepository {
   ): Promise<Page<ConversationSummary, ConversationCursor>>;
   /** Returns false when the row is already being deleted, or is not the caller's. */
   markDeleting(scope: OwnerScope, id: ConversationId, now: Date): Promise<boolean>;
+  /**
+   * Removes a conversation that was marked for deletion, and its messages with
+   * it. No `OwnerScope`, because the caller is the system finishing work an
+   * owner already asked for — and `deleting` is what stands in for the check:
+   * only `markDeleting` puts a row in that state, and only after the owner was
+   * verified, so a conversation somebody is still using cannot be destroyed
+   * here however the id arrived.
+   *
+   * False when there was nothing to remove, which is the ordinary answer to a
+   * job delivered twice rather than a failure.
+   */
+  purge(id: ConversationId): Promise<boolean>;
 }

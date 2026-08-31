@@ -79,6 +79,42 @@ describe('one user cannot reach another user data', () => {
     expect(await conversationsRepo.findById({ userId: ada }, id)).not.toBeNull();
   });
 
+  it('removes only a conversation that was marked for it', async () => {
+    // `purge` runs from a queue with no owner behind it, so `deleting` is what
+    // stands in for the ownership check. An id that arrived from anywhere must
+    // not be able to destroy a conversation someone is still using.
+    const active = await insertConversation(h.db, ada, 'in use');
+
+    expect(await conversationsRepo.purge(active)).toBe(false);
+    expect(await conversationsRepo.findById({ userId: ada }, active)).not.toBeNull();
+  });
+
+  it('removes a conversation that was marked, and says so once', async () => {
+    const id = await insertConversation(h.db, ada);
+    await conversationsRepo.markDeleting({ userId: ada }, id, new Date());
+
+    expect(await conversationsRepo.purge(id)).toBe(true);
+    // The second answer is what a job delivered twice gets: nothing to do, and
+    // not an error.
+    expect(await conversationsRepo.purge(id)).toBe(false);
+  });
+
+  it('takes the messages with it', async () => {
+    const id = await insertConversation(h.db, ada);
+    await messagesRepo.append({
+      conversationId: id,
+      clientMessageId: null,
+      role: 'user',
+      parts: [{ kind: 'text', text: 'hello' }],
+      status: 'complete',
+    });
+    await conversationsRepo.markDeleting({ userId: ada }, id, new Date());
+
+    await conversationsRepo.purge(id);
+
+    expect(await h.db.select().from(messages)).toEqual([]);
+  });
+
   it('stops answering for a conversation once it is on its way out', async () => {
     const id = await insertConversation(h.db, ada);
     await conversationsRepo.markDeleting({ userId: ada }, id, new Date());

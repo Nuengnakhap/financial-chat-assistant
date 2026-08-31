@@ -7,6 +7,7 @@ import type { ConversationRepository } from '../ports/conversation.repository';
 import { CreateConversationUseCase } from '../use-cases/create-conversation.use-case';
 import { DescribeConversationUseCase } from '../use-cases/describe-conversation.use-case';
 import { ListConversationsUseCase } from '../use-cases/list-conversations.use-case';
+import { PurgeConversationUseCase } from '../use-cases/purge-conversation.use-case';
 import { RemoveConversationUseCase } from '../use-cases/remove-conversation.use-case';
 
 const ADA = 'e5c9f4a1-1f0e-4a6a-9d4e-0c8b6a3f21d0' as UserId;
@@ -25,9 +26,16 @@ const create = vi.fn();
 const findById = vi.fn();
 const listForOwner = vi.fn();
 const markDeleting = vi.fn();
+const purge = vi.fn();
 const published: DomainEvent[] = [];
 
-const repository = (): ConversationRepository => ({ create, findById, listForOwner, markDeleting });
+const repository = (): ConversationRepository => ({
+  create,
+  findById,
+  listForOwner,
+  markDeleting,
+  purge,
+});
 
 /**
  * The real `UnitOfWork` contract with a fake body: `publish` buffers, and the
@@ -185,5 +193,22 @@ describe('asking for a conversation to go', () => {
 
     expect(!started.ok && started.error.code).toBe('not_found');
     expect(markDeleting).not.toHaveBeenCalled();
+  });
+});
+
+describe('finishing a deletion', () => {
+  it('removes the conversation the event names', async () => {
+    purge.mockResolvedValue(true);
+
+    expect(await new PurgeConversationUseCase(uow).execute(ID)).toBe(true);
+    expect(purge).toHaveBeenCalledWith(ID);
+  });
+
+  it('reports nothing removed rather than failing when the job arrives twice', async () => {
+    // At-least-once delivery makes this the ordinary case, not the exception.
+    // A throw here would turn a duplicate into a job that never completes.
+    purge.mockResolvedValue(false);
+
+    expect(await new PurgeConversationUseCase(uow).execute(ID)).toBe(false);
   });
 });
