@@ -8,13 +8,14 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TxContext, UnitOfWork } from '../../../shared/persistence/unit-of-work';
-import { conversationCursor } from '../pagination';
+import { conversationCursor, messageCursor } from '../pagination';
 import type { ConversationRepository } from '../ports/conversation.repository';
 import type { MessageRepository } from '../ports/message.repository';
 import { AppendUserMessageUseCase } from '../use-cases/append-user-message.use-case';
 import { CreateConversationUseCase } from '../use-cases/create-conversation.use-case';
 import { DescribeConversationUseCase } from '../use-cases/describe-conversation.use-case';
 import { ListConversationsUseCase } from '../use-cases/list-conversations.use-case';
+import { ListMessagesUseCase } from '../use-cases/list-messages.use-case';
 import { PurgeConversationUseCase } from '../use-cases/purge-conversation.use-case';
 import { RemoveConversationUseCase } from '../use-cases/remove-conversation.use-case';
 
@@ -233,6 +234,58 @@ describe('finishing a deletion', () => {
     purge.mockResolvedValue(false);
 
     expect(await new PurgeConversationUseCase(uow).execute(ID)).toBe(false);
+  });
+});
+
+describe('reading the history of a conversation', () => {
+  const page = { limit: 100 };
+
+  it('answers not found before it reads a single message', async () => {
+    // An empty page and a conversation that is not yours read the same on a
+    // screen, and the difference is what tells an asker their id was real.
+    findById.mockResolvedValue(null);
+
+    const history = await new ListMessagesUseCase(uow).execute(SCOPE, ID, page);
+
+    expect(!history.ok && history.error.code).toBe('not_found');
+    expect(listForConversation).not.toHaveBeenCalled();
+  });
+
+  it('hands back a cursor that names where it stopped', async () => {
+    findById.mockResolvedValue(summary());
+    listForConversation.mockResolvedValue({ items: [], nextCursor: { seq: 12 } });
+
+    const history = await new ListMessagesUseCase(uow).execute(SCOPE, ID, page);
+
+    expect(history.ok && messageCursor.decode(history.value.nextCursor ?? '')).toMatchObject({
+      ok: true,
+      value: { seq: 12 },
+    });
+  });
+
+  it('says there is nothing older rather than inventing a page', async () => {
+    findById.mockResolvedValue(summary());
+    listForConversation.mockResolvedValue({ items: [], nextCursor: null });
+
+    const history = await new ListMessagesUseCase(uow).execute(SCOPE, ID, page);
+
+    expect(history.ok && history.value.nextCursor).toBeNull();
+  });
+
+  it('refuses an edited cursor without asking the database anything', async () => {
+    const history = await new ListMessagesUseCase(uow).execute(SCOPE, ID, {
+      ...page,
+      cursor: 'not-a-cursor',
+    });
+
+    expect(!history.ok && history.error.code).toBe('validation');
+    expect(findById).not.toHaveBeenCalled();
+  });
+
+  it('answers not found for an id that could not name a conversation', async () => {
+    const history = await new ListMessagesUseCase(uow).execute(SCOPE, 'nonsense', page);
+
+    expect(!history.ok && history.error.code).toBe('not_found');
   });
 });
 

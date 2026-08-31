@@ -1,11 +1,27 @@
-import { conversationsContract, type ConversationView, type Ok } from '@fca/contracts';
-import { Controller, Delete, Get, HttpCode, Param, UseGuards } from '@nestjs/common';
+import {
+  conversationsContract,
+  type ConversationView,
+  type ListMessagesQuery,
+  type MessageView,
+  type Ok,
+} from '@fca/contracts';
+import { Controller, Delete, Get, HttpCode, Param, Query, UseGuards } from '@nestjs/common';
 
 import { toConversationView } from './conversation-view';
+import { toMessageView } from './message-view';
 import { requirePrincipal } from '../../shared/http/request-context';
 import { SessionGuard } from '../../shared/http/session.guard';
+import { ZodPayload } from '../../shared/http/zod-payload.pipe';
 import { DescribeConversationUseCase } from '../application/use-cases/describe-conversation.use-case';
+import { ListMessagesUseCase } from '../application/use-cases/list-messages.use-case';
 import { RemoveConversationUseCase } from '../application/use-cases/remove-conversation.use-case';
+
+const MESSAGES_QUERY = new ZodPayload(conversationsContract.listMessages.query);
+
+interface MessagesPage {
+  readonly items: readonly MessageView[];
+  readonly nextCursor: string | null;
+}
 
 const ACCEPTED: Ok = { ok: true };
 
@@ -19,6 +35,7 @@ const ACCEPTED: Ok = { ok: true };
 export class ConversationController {
   constructor(
     private readonly describe: DescribeConversationUseCase,
+    private readonly history: ListMessagesUseCase,
     private readonly remove: RemoveConversationUseCase,
   ) {}
 
@@ -29,6 +46,20 @@ export class ConversationController {
     if (!found.ok) throw found.error;
 
     return { conversation: toConversationView(found.value) };
+  }
+
+  @Get(conversationsContract.listMessages.path)
+  async listMessages(
+    @Param('id') id: string,
+    @Query(MESSAGES_QUERY) query: ListMessagesQuery,
+  ): Promise<MessagesPage> {
+    const { userId } = requirePrincipal();
+    const page = await this.history.execute({ userId }, id, query);
+    // A conversation that is not the caller's answers 404 here as it does
+    // above; a cursor somebody edited is the same 400 any bad field gets.
+    if (!page.ok) throw page.error;
+
+    return { items: page.value.items.map(toMessageView), nextCursor: page.value.nextCursor };
   }
 
   @Delete(conversationsContract.remove.path)

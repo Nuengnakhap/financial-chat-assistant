@@ -24,6 +24,7 @@ import { AppLogger, createPinoLogger } from '../../../shared/observability/app-l
 import { CreateConversationUseCase } from '../../application/use-cases/create-conversation.use-case';
 import { DescribeConversationUseCase } from '../../application/use-cases/describe-conversation.use-case';
 import { ListConversationsUseCase } from '../../application/use-cases/list-conversations.use-case';
+import { ListMessagesUseCase } from '../../application/use-cases/list-messages.use-case';
 import { RemoveConversationUseCase } from '../../application/use-cases/remove-conversation.use-case';
 import { ConversationController } from '../conversation.controller';
 import { ConversationsController } from '../conversations.controller';
@@ -39,6 +40,7 @@ const list = { execute: vi.fn() };
 const create = { execute: vi.fn() };
 const describeOne = { execute: vi.fn() };
 const remove = { execute: vi.fn() };
+const history = { execute: vi.fn() };
 /**
  * The real guard runs, against the narrow capability it declares rather than
  * against a JWT — verifying one has its own spec, and this context could not
@@ -58,6 +60,7 @@ const verifyAccessToken = vi.fn();
     { provide: CreateConversationUseCase, useValue: create },
     { provide: DescribeConversationUseCase, useValue: describeOne },
     { provide: RemoveConversationUseCase, useValue: remove },
+    { provide: ListMessagesUseCase, useValue: history },
     { provide: ACCESS_TOKEN_VERIFIER, useValue: { verifyAccessToken } },
     SessionGuard,
     { provide: APP_FILTER, useClass: DomainErrorFilter },
@@ -103,6 +106,7 @@ const ROUTES = [
   ['POST', '/api/v1/conversations'],
   ['GET', `/api/v1/conversations/${ID}`],
   ['DELETE', `/api/v1/conversations/${ID}`],
+  ['GET', `/api/v1/conversations/${ID}/messages`],
 ] as const;
 
 describe('the conversation routes', () => {
@@ -121,6 +125,7 @@ describe('the conversation routes', () => {
       'POST /api/v1/conversations': 401,
       [`GET /api/v1/conversations/${ID}`]: 401,
       [`DELETE /api/v1/conversations/${ID}`]: 401,
+      [`GET /api/v1/conversations/${ID}/messages`]: 401,
     });
     // Not one of them reached a use case: the guard runs first.
     expect(list.execute).not.toHaveBeenCalled();
@@ -235,6 +240,67 @@ describe('one conversation', () => {
     remove.execute.mockResolvedValue(Err(new NotFoundError('gone')));
 
     const response = await call('DELETE', `/api/v1/conversations/${ID}`);
+
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+describe('the history of a conversation', () => {
+  const MESSAGE = {
+    id: '2b8e1b4a-6a1e-4d5e-9c3f-0f1a2b3c4d5e',
+    conversationId: ID,
+    seq: 1,
+    role: 'user' as const,
+    status: 'complete' as const,
+    parts: [{ kind: 'text', text: 'hello' }],
+    verification: null,
+    createdAt: NOW,
+  };
+
+  it('renders what the client will read, shape and all', async () => {
+    history.execute.mockResolvedValue(Ok({ items: [MESSAGE], nextCursor: 'older' }));
+
+    const response = await call('GET', `/api/v1/conversations/${ID}/messages`);
+
+    expect(response.statusCode).toBe(200);
+    expect(conversationsContract.listMessages.response.parse(response.json())).toEqual({
+      items: [
+        {
+          id: MESSAGE.id,
+          conversationId: ID,
+          seq: 1,
+          role: 'user',
+          status: 'complete',
+          parts: [{ kind: 'text', text: 'hello' }],
+          verification: null,
+          usage: null,
+          error: null,
+          createdAt: NOW.toISOString(),
+        },
+      ],
+      nextCursor: 'older',
+    });
+  });
+
+  it('fills in the limit the contract defaults to', async () => {
+    history.execute.mockResolvedValue(Ok({ items: [], nextCursor: null }));
+
+    await call('GET', `/api/v1/conversations/${ID}/messages`);
+
+    expect(history.execute).toHaveBeenCalledWith({ userId: ADA }, ID, { limit: 100 });
+  });
+
+  it('refuses a limit past what the contract allows', async () => {
+    const response = await call('GET', `/api/v1/conversations/${ID}/messages?limit=500`);
+
+    expect(response.statusCode).toBe(400);
+    expect(history.execute).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for a conversation that is not the caller to read', async () => {
+    history.execute.mockResolvedValue(Err(new NotFoundError('gone')));
+
+    const response = await call('GET', `/api/v1/conversations/${ID}/messages`);
 
     expect(response.statusCode).toBe(404);
   });

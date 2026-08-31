@@ -5,6 +5,7 @@ import { AppendUserMessageUseCase } from './application/use-cases/append-user-me
 import { CreateConversationUseCase } from './application/use-cases/create-conversation.use-case';
 import { DescribeConversationUseCase } from './application/use-cases/describe-conversation.use-case';
 import { ListConversationsUseCase } from './application/use-cases/list-conversations.use-case';
+import { ListMessagesUseCase } from './application/use-cases/list-messages.use-case';
 import { PurgeConversationUseCase } from './application/use-cases/purge-conversation.use-case';
 import { RemoveConversationUseCase } from './application/use-cases/remove-conversation.use-case';
 import { ConversationDeletionSubscriber } from './infrastructure/conversation-deletion.subscriber';
@@ -24,6 +25,7 @@ import { PersistenceModule } from '../shared/persistence/persistence.module';
   controllers: [ConversationsController, ConversationController],
   providers: [
     ListConversationsUseCase,
+    ListMessagesUseCase,
     AppendUserMessageUseCase,
     CreateConversationUseCase,
     DescribeConversationUseCase,
