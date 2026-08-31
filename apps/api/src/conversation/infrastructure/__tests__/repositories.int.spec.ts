@@ -74,7 +74,18 @@ describe('one user cannot reach another user data', () => {
     const id = await insertConversation(h.db, ada);
 
     expect(await conversationsRepo.markDeleting({ userId: grace }, id, new Date())).toBe(false);
-    expect((await conversationsRepo.findById({ userId: ada }, id))?.state).toBe('active');
+    // Still readable by its owner, which is how "nothing happened" is visible:
+    // a conversation on its way out reads as absent.
+    expect(await conversationsRepo.findById({ userId: ada }, id)).not.toBeNull();
+  });
+
+  it('stops answering for a conversation once it is on its way out', async () => {
+    const id = await insertConversation(h.db, ada);
+    await conversationsRepo.markDeleting({ userId: ada }, id, new Date());
+
+    // Not a state on the summary for a caller to check — the row is simply not
+    // findable, so no use case can forget the rule.
+    expect(await conversationsRepo.findById({ userId: ada }, id)).toBeNull();
   });
 });
 

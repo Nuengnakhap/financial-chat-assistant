@@ -5,7 +5,6 @@ import type { ConversationCursor, Page, PageRequest } from '../pagination';
 export interface ConversationSummary {
   readonly id: ConversationId;
   readonly title: string;
-  readonly state: 'active' | 'deleting';
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -18,6 +17,11 @@ export interface NewConversation {
 
 export interface ConversationRepository {
   create(scope: OwnerScope, conversation: NewConversation): Promise<void>;
+  /**
+   * `null` for a conversation that is not there, is not the caller's, or is on
+   * its way out. There is no state on the summary to check afterwards, because
+   * a check a caller can forget is one a caller will forget.
+   */
   findById(scope: OwnerScope, id: ConversationId): Promise<ConversationSummary | null>;
   /**
    * Most recently used first, and only the ones that are still there: a

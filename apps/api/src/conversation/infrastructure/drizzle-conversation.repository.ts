@@ -18,10 +18,17 @@ import type {
 const COLUMNS = {
   id: conversations.id,
   title: conversations.title,
-  state: conversations.state,
   createdAt: conversations.createdAt,
   updatedAt: conversations.updatedAt,
 };
+
+/**
+ * The one clause that makes a conversation on its way out answer as one that
+ * never existed. Written once and applied by every read, so it is not a rule a
+ * use case has to remember — and it is why `ConversationSummary` carries no
+ * state for anyone to forget to check.
+ */
+const VISIBLE = eq(conversations.state, 'active');
 
 export class DrizzleConversationRepository implements ConversationRepository {
   constructor(private readonly db: DbOrTx) {}
@@ -42,7 +49,7 @@ export class DrizzleConversationRepository implements ConversationRepository {
     const [row] = await this.db
       .select(COLUMNS)
       .from(conversations)
-      .where(and(eq(conversations.id, id), eq(conversations.userId, scope.userId)))
+      .where(and(eq(conversations.id, id), eq(conversations.userId, scope.userId), VISIBLE))
       .limit(1);
 
     return row === undefined ? null : toSummary(row);
@@ -93,16 +100,7 @@ export function conversationPageQuery(
     db
       .select(COLUMNS)
       .from(conversations)
-      .where(
-        and(
-          eq(conversations.userId, scope.userId),
-          // A conversation on its way out is gone as far as anyone reading is
-          // concerned. Cut here rather than in a use case, so there is one place
-          // it can be forgotten and it is this one.
-          eq(conversations.state, 'active'),
-          further(request.cursor),
-        ),
-      )
+      .where(and(eq(conversations.userId, scope.userId), VISIBLE, further(request.cursor)))
       .orderBy(desc(conversations.updatedAt), desc(conversations.id))
       // One more than asked for. See `pageOf`.
       .limit(request.limit + 1)
@@ -124,7 +122,6 @@ function further(cursor: ConversationCursor | null): SQL | undefined {
 function toSummary(row: {
   id: string;
   title: string;
-  state: 'active' | 'deleting';
   createdAt: Date;
   updatedAt: Date;
 }): ConversationSummary {

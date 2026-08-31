@@ -15,14 +15,14 @@ src/
 │   ├── fastify.ts           adapter options, request-id hook
 │   ├── task-registry.ts     every background task, so shutdown can wait for it
 │   └── shutdown.ts          the order things stop in
-├── conversation/            bounded context: ports and their Drizzle adapters
+├── conversation/            bounded context: conversations and their messages
 ├── identity/                bounded context: password hashing, tokens, sessions
 └── shared/
     ├── async/               the one place a timeout is written
     ├── config/              the APP_CONFIG token
     ├── cpu/                 worker pool for work that would stall the event loop
     ├── health/              live and ready probes
-    ├── http/                response envelope, error filter, request context
+    ├── http/                response envelope, error filter, request context, session guard
     ├── observability/       AppLogger and the bridge NestJS logs through
     ├── persistence/         schema, DatabaseService, UnitOfWork, outbox relay
     └── redis/               RedisService, Lua scripts, the key registry
@@ -152,6 +152,18 @@ verified token and never from a body or a query string. Reaching for another
 user's session answers 404 rather than 403, and so does an id that is not even a
 UUID — a 403 confirms the id names something, and a 400 separates "wrong shape"
 from "not yours", which is half of what the 404 is hiding.
+
+A conversation is deleted in two halves. The request marks it `deleting` and
+writes `conversation.delete_requested` to the outbox in one transaction, then
+answers 202 — from that moment it is absent from every read, because the clause
+that hides it is in the repository rather than in each use case, and
+`ConversationSummary` carries no state for a caller to forget to check. The rows
+go afterwards, in a worker: a conversation may have a generation running against
+it, and stopping that crosses Redis and a queue and has to survive being
+retried, none of which one HTTP request can offer. Deleting the same
+conversation twice is a 404 the second time, and publishes nothing — the update
+is conditional on the conversation still being active, so two clicks cannot
+queue two deletions.
 
 Sessions and their tokens are the only tables that grow with every sign-in and
 every refresh and are never otherwise deleted from, so `SessionJanitor` sweeps
