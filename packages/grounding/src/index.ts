@@ -28,3 +28,5 @@ export {
   type Quantity,
 } from './quantity';
 export { numericCells, type Cell, type ToolResult } from './tool-result';
+export { coversYear, type ColumnKind, type Coverage } from './coverage';
+export { verify } from './verify';

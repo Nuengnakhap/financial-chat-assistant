@@ -12,8 +12,24 @@
  * `avg()` return, decimals and all.
  */
 
+/**
+ * One query the model ran — and *ran* is the word, not *succeeded*. A call that
+ * came back an error is still one of these, with no columns and no rows.
+ *
+ * That distinction carries weight in two places at once. Nothing in an empty
+ * result can support a figure, so a number stated after one is refused exactly
+ * as it should be. But the model did look, and a sentence saying the dataset
+ * cannot answer then rests on something that happened rather than on the model's
+ * own reading of the catalog — which is the difference `verify` draws between a
+ * refusal it accepts and one it does not.
+ *
+ * So a caller must pass a failed call through rather than dropping it. Dropping
+ * it would make an honest "the query failed, so I cannot tell you"
+ * indistinguishable from never having asked.
+ */
 export interface ToolResult {
   readonly toolCallId: string;
+  /** Empty when the query did not run. */
   readonly columns: readonly string[];
   /** Row-major, aligned with `columns`. `null` is a value that was not recorded. */
   readonly rows: readonly (readonly (string | null)[])[];

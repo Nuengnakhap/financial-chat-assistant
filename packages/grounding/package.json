@@ -19,6 +19,9 @@
     "build": "tsc -b tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
+  "dependencies": {
+    "@fca/contracts": "workspace:*"
+  },
   "devDependencies": {
     "fast-check": "^4.9.0"
   }

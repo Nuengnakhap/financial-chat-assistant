@@ -229,6 +229,10 @@ importers:
   packages/domain: {}
 
   packages/grounding:
+    dependencies:
+      '@fca/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       fast-check:
         specifier: ^4.9.0

@@ -6,6 +6,7 @@
     "outDir": "./dist",
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
+  "references": [{ "path": "../contracts/tsconfig.build.json" }],
   "include": ["src/**/*.ts"],
   // The whole tree, not just specs: a helper beside them would be shipped in dist.
   "exclude": ["src/**/__tests__/**", "src/**/*.spec.ts"]

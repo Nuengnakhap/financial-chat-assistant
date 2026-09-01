@@ -1,4 +1,4 @@
-import { add, compare, divide, exact, multiply, subtract, type Quantity } from './quantity';
+import { add, compare, divide, exact, multiply, ratio, subtract, type Quantity } from './quantity';
 
 /**
  * Formatting and tolerance are one decision, which is why they are one file.
@@ -162,6 +162,23 @@ export function bandOf(reading: Reading): Band {
 
 export function contains(band: Band, value: Quantity): boolean {
   return compare(band.low, value) <= 0 && compare(value, band.high) <= 0;
+}
+
+/**
+ * The reading's own interval plus the two either side of it — everything the
+ * neighbouring strings would have covered.
+ *
+ * It is what separates a figure that is wrong from a figure that was invented.
+ * `$96.9B` against a table holding 96,995,000,000 is a digit misread: the value
+ * is one string away, and saying so gives the repair round something to correct.
+ * `$85.2B` is not near anything, and telling the model to adjust it would be
+ * inviting a second guess.
+ */
+export function neighbourhoodOf(reading: Reading): Band {
+  const centre = valueOf(reading);
+  const reach = multiply(reading.step, ratio(3n, 2n));
+
+  return { low: subtract(centre, reach), high: add(centre, reach) };
 }
 
 /** Three integer digits is where a scale ends; a fourth means the next one up. */
