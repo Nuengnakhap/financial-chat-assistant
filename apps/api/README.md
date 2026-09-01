@@ -17,10 +17,13 @@ src/
 │   └── shutdown.ts          the order things stop in
 ├── conversation/            bounded context: conversations and their messages
 ├── identity/                bounded context: password hashing, tokens, sessions
+├── generation/              bounded context: the SQL policy and the query tool
 └── shared/
     ├── async/               the one place a timeout is written
+    ├── cache/               LayeredCache: memory, Redis, and one call to the source
     ├── config/              the APP_CONFIG token
     ├── cpu/                 worker pool for work that would stall the event loop
+    ├── financial/           the pool SQL written by a model runs on, as llm_reader
     ├── health/              live and ready probes
     ├── http/                response envelope, error filter, request context, session guard
     ├── observability/       AppLogger and the bridge NestJS logs through
@@ -29,9 +32,9 @@ src/
     └── redis/               RedisService, Lua scripts, the key registry
 ```
 
-The remaining bounded contexts (`generation/`, `budget/`) land as they are
-built, each split into `domain`, `application`, `infrastructure` and
-`presentation`. A layer may only depend inwards and a context may not import
+`budget/` lands as it is built, split into `domain`, `application`,
+`infrastructure` and `presentation`; `generation/` has the first two of those so
+far — the model, the runner and the stream are the phases after this one. A layer may only depend inwards and a context may not import
 another's internals — both enforced by `.dependency-cruiser.cjs`, with fixtures
 in `tools/architecture/` that prove the rules fire. Anything two contexts need
 to say the same way, such as `OwnerScope`, lives in `@fca/domain` rather than in
@@ -54,7 +57,8 @@ code from that set, so a client switches on one thing.
 
 **A log line cannot carry message content.** `LogContext` lists the only fields
 allowed — `requestId`, `userIdHash`, `conversationId`, `messageId`, `durationMs`,
-`scope`, `task`, `err` — so attaching an answer or a question is a compile error rather
+`scope`, `task`, `sqlDigest`, `rows`, `err` — so attaching an answer or a question
+is a compile error rather
 than a rule to remember. `AppLogger` deliberately does not implement NestJS's
 `LoggerService`, whose `(message: any, ...params: any[])` signature would reopen
 the hole; `NestLoggerBridge` adapts the framework's calls instead.
@@ -94,6 +98,48 @@ Every invariant the domain states is also a database constraint — `UNIQUE`,
 `CHECK`, a partial unique index — because application code is the layer most
 likely to have the bug. `src/shared/persistence/__tests__/constraints.int.spec.ts`
 watches each one reject what it claims to.
+
+**SQL from the model is a tree before it is a statement, and only the tree that
+was accepted ever runs.** `PgAstSqlPolicy` parses with PostgreSQL's own parser,
+walks every key of the resulting tree against an allowlist, and hands back the
+**deparsed** form — so a comment hiding a second statement, or anything else the
+parser reads differently from a person, is discarded with the original string.
+The allowlist is inverted on purpose: a list of forbidden node types is a list of
+the ones somebody thought of, and `SELECT * INTO t2 FROM x` settles that on its
+own by arriving as a field on the select with no node type of its own to forbid.
+
+The result is a `CanonicalSql`, whose constructor is private and whose factory a
+lint rule keeps inside the policy, and `FinancialQueryPool.query` takes nothing
+else — so "run this string the model wrote" does not compile. Under that sits the
+`llm_reader` role: `SELECT` on one table, read-only, cut off after three seconds.
+`financial-query.int.spec.ts` executes the shipped `01-roles.sql` and
+`grant-llm-reader.sql` against a real server and then watches PostgreSQL refuse
+a write, refuse another table, and cancel a query that will not finish.
+
+A result goes back to the model as columns, rows and a ready-made display string
+for every column holding an amount — formatted by the same function the finished
+answer is checked against, so a figure the model copies is supported by
+definition rather than by luck. Which columns those are is read off the query
+rather than off the names it returns: `sum(revenue)` comes back called `sum`, and
+a name is not a unit. A `*` is resolved through every relation it ranges over —
+the table, a `WITH` name, a subselect, both sides of a join — rather than assumed
+to be the table's columns, and where the unit still cannot be established, an
+expression dividing one amount by another for instance, there is no display
+string at all. A wrong one is worse than none: evidence is matched by value across
+every column, so `$2.0K` printed against the fiscal year 2024 would find support
+in the year column and pass verification while being wrong.
+
+For the same reason the policy refuses a query whose result would have two
+columns of the same name. `SELECT sum(revenue), sum(net_income)` returns two
+columns both called `sum`; the display strings are keyed by name, so one cannot
+be expressed at all, and a figure copied from the survivor finds support in the
+other column. The model is told to name them with `AS`. Resolving `*` is what
+makes that check able to see the collision: `SELECT a.*, b.revenue` over a
+self-join has a `revenue` on each side, and reading the star as "no columns"
+rather than as "these columns" is what once let this year's question be answered
+with last year's figure. The tool declines to build a display string for a name
+the driver returned twice as well, since that guard does not depend on any of the
+reasoning above being right.
 
 **A list is read by keyset, never by offset.** `OFFSET n` reads n rows in order
 to throw them away, and the rows move underneath whoever is reading: a
