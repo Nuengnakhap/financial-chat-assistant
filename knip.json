@@ -19,6 +19,10 @@
       "entry": ["src/index.ts", "src/**/*.spec.ts"],
       "project": ["src/**/*.ts"]
     },
+    "packages/grounding": {
+      "entry": ["src/index.ts", "src/**/*.spec.ts"],
+      "project": ["src/**/*.ts"]
+    },
     "apps/web": {
       "entry": ["index.html", "src/**/*.spec.tsx", "src/**/*.spec.ts"],
       "project": ["src/**/*.{ts,tsx,css}"],

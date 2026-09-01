@@ -13,7 +13,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     projects: [
-      ...['domain', 'config', 'contracts'].map((name) => ({
+      ...['domain', 'config', 'contracts', 'grounding'].map((name) => ({
         test: {
           name,
           root: `./packages/${name}`,

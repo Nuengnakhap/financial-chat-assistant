@@ -111,6 +111,7 @@ apps/api/            NestJS on Fastify — see its README
 apps/web/            Vite + React browser client — see its README
 packages/domain/     Framework-free business rules — see its README
 packages/contracts/  Every HTTP body and SSE event, shared by API and web
+packages/grounding/  What a figure means and what the results prove — see its README
 packages/config/     Environment parsing and typed configuration
 data/                SQL dump, grants and indexes for the financial dataset
 infra/               Docker Compose stack and database bootstrap scripts

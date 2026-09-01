@@ -6,6 +6,7 @@
     { "path": "./packages/domain/tsconfig.build.json" },
     { "path": "./packages/config/tsconfig.build.json" },
     { "path": "./packages/contracts/tsconfig.build.json" },
+    { "path": "./packages/grounding/tsconfig.build.json" },
     { "path": "./apps/api/tsconfig.build.json" },
     { "path": "./apps/web/tsconfig.build.json" }
   ]

@@ -1,0 +1,25 @@
+{
+  "name": "@fca/grounding",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Framework-free grounding core: what a figure means, what the query results prove, and which figures in an answer are claims",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "fast-check": "^4.9.0"
+  }
+}
