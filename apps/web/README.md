@@ -147,6 +147,15 @@ const { user } = await api.auth.me();
 await api.auth.revokeSession({ params: { id } });
 ```
 
+A paginated endpoint takes a query the same way, and a field with no value is
+left out of the URL rather than sent as the word `null` — which is what the
+first page's absent cursor would otherwise become, and what the server would
+then try to decode. The field names come from the schema; the values are
+narrowed to `string | number | null` on purpose, because `z.coerce.number()`
+declares its input as `unknown`, and that would let an object be stringified
+into a URL. An endpoint whose payload is entirely optional is called with no
+arguments at all rather than with an empty object to satisfy a signature.
+
 A wrong body, a missing path parameter, an endpoint that does not exist, or a
 field read off the answer that the schema does not have are all compile errors —
 `lib/api/__tests__/client.spec.ts` keeps four of them as `@ts-expect-error`, which fail

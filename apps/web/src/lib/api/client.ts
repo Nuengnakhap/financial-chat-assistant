@@ -1,4 +1,4 @@
-import { authContract } from '@fca/contracts';
+import { authContract, conversationsContract } from '@fca/contracts';
 import type { z } from 'zod';
 
 import { apiFetch } from './http';
@@ -8,6 +8,7 @@ interface Endpoint {
   readonly path: string;
   readonly status: number;
   readonly body?: z.ZodType;
+  readonly query?: z.ZodType;
   readonly response: z.ZodType;
 }
 
@@ -32,7 +33,24 @@ type BodyArg<E extends Endpoint> = E extends { readonly body: infer B extends z.
     : { readonly body: z.input<B> }
   : unknown;
 
-type Payload<E extends Endpoint> = ParamsArg<E> & BodyArg<E>;
+/**
+ * The field names come from the schema; the values do not. A query string
+ * carries text, and `z.coerce.number()` declares its input as `unknown`, which
+ * would let a caller pass an object and have it stringified into the URL.
+ */
+type QueryFields<Q extends z.ZodType> = {
+  readonly [Name in keyof z.input<Q>]?: string | number | null;
+};
+
+/**
+ * Optional as a whole, because every paginated endpoint here holds its defaults
+ * on the server: no query means the first page rather than an incomplete request.
+ */
+type QueryArg<E extends Endpoint> = E extends { readonly query: infer Q extends z.ZodType }
+  ? { readonly query?: QueryFields<Q> }
+  : unknown;
+
+type Payload<E extends Endpoint> = ParamsArg<E> & BodyArg<E> & QueryArg<E>;
 
 /**
  * Every call may carry a signal, whether or not it carries anything else, so a
@@ -42,9 +60,14 @@ interface CallOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * Optional as a whole when nothing in it is required — an endpoint whose only
+ * payload is a query with defaults on the server is called with no arguments at
+ * all, rather than with an empty object to satisfy a signature.
+ */
 type Operation<E extends Endpoint> =
-  unknown extends Payload<E>
-    ? (args?: CallOptions) => Promise<z.output<E['response']>>
+  Record<string, never> extends Payload<E>
+    ? (args?: Payload<E> & CallOptions) => Promise<z.output<E['response']>>
     : (args: Payload<E> & CallOptions) => Promise<z.output<E['response']>>;
 
 type Client<T extends Record<string, Record<string, Endpoint>>> = {
@@ -62,7 +85,28 @@ function fillPath(path: string, params: Readonly<Record<string, string>>): strin
 interface CallArgs {
   readonly params?: Readonly<Record<string, string>>;
   readonly body?: unknown;
+  readonly query?: Readonly<Record<string, string | number | null | undefined>>;
   readonly signal?: AbortSignal;
+}
+
+/**
+ * A field with no value is left out rather than sent as the word "undefined" or
+ * "null" — which is what a cursor would become on the first page, and what the
+ * server would then try to decode.
+ */
+function withQuery(
+  path: string,
+  query: Readonly<Record<string, string | number | null | undefined>> | undefined,
+): string {
+  if (query === undefined) return path;
+
+  const search = new URLSearchParams();
+  for (const [name, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null) search.set(name, String(value));
+  }
+  const rendered = search.toString();
+
+  return rendered === '' ? path : `${path}?${rendered}`;
 }
 
 function operation(endpoint: Endpoint): (args?: CallArgs) => Promise<unknown> {
@@ -73,7 +117,7 @@ function operation(endpoint: Endpoint): (args?: CallArgs) => Promise<unknown> {
     const body = args.body ?? (endpoint.body === undefined ? undefined : {});
     const payload = await apiFetch({
       method: endpoint.method,
-      path: fillPath(endpoint.path, args.params ?? {}),
+      path: withQuery(fillPath(endpoint.path, args.params ?? {}), args.query),
       expect: endpoint.status,
       ...(body === undefined ? {} : { body }),
       ...(args.signal === undefined ? {} : { signal: args.signal }),
@@ -107,4 +151,4 @@ function createClient<T extends Record<string, Record<string, Endpoint>>>(contra
   return Object.fromEntries(groups) as Client<T>;
 }
 
-export const api = createClient({ auth: authContract });
+export const api = createClient({ auth: authContract, conversations: conversationsContract });

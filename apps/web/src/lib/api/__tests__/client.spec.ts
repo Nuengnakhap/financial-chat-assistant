@@ -130,6 +130,66 @@ describe('the client built from the contracts', () => {
   });
 });
 
+describe('a query string', () => {
+  const emptyPage = () => json({ items: [], nextCursor: null });
+
+  const urlOf = async (call: () => Promise<unknown>): Promise<string> => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        asked.push(
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+        );
+        return Promise.resolve(emptyPage());
+      }),
+    );
+    await call();
+
+    return asked[0] ?? '';
+  };
+
+  it('is left off entirely when nothing was asked for', async () => {
+    expect(await urlOf(async () => await api.conversations.list())).toBe('/api/v1/conversations');
+  });
+
+  it('carries what was asked for', async () => {
+    const url = await urlOf(async () => await api.conversations.list({ query: { limit: 20 } }));
+
+    expect(url).toBe('/api/v1/conversations?limit=20');
+  });
+
+  it('leaves out a field with no value, rather than sending the word null', async () => {
+    // The first page has no cursor. Sent as `cursor=null` the server would try
+    // to decode the word and answer 400 for a request that was fine.
+    const url = await urlOf(
+      async () => await api.conversations.list({ query: { limit: 20, cursor: null } }),
+    );
+
+    expect(url).toBe('/api/v1/conversations?limit=20');
+  });
+
+  it('escapes a cursor whatever the server put in it', async () => {
+    const url = await urlOf(
+      async () => await api.conversations.list({ query: { cursor: 'a b&c=d' } }),
+    );
+
+    expect(url).toBe('/api/v1/conversations?cursor=a+b%26c%3Dd');
+  });
+
+  it('goes on the end of a path that already had a parameter filled in', async () => {
+    const url = await urlOf(
+      async () =>
+        await api.conversations.listMessages({
+          params: { id: '11111111-1111-4111-8111-111111111111' },
+          query: { limit: 5 },
+        }),
+    );
+
+    expect(url).toBe('/api/v1/conversations/11111111-1111-4111-8111-111111111111/messages?limit=5');
+  });
+});
+
 describe('the types', () => {
   it('rejects every wrong call at compile time', () => {
     // Declared and never called. `@ts-expect-error` fails the build if the line
