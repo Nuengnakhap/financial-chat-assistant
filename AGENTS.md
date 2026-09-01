@@ -119,6 +119,10 @@ pnpm eval             # deterministic grounding suite (CI gate)
 pnpm lint             # eslint + dependency-cruiser + knip
 ```
 
+`pnpm test:e2e` and `pnpm eval` are the two entries that do not exist yet, and
+neither does `packages/grounding`: they arrive with the grounding milestone.
+Everything else in this list runs today.
+
 ## Definition of done for a change
 
 Behaviour has a test that would fail if the code were wrong; new invariants are
