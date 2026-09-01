@@ -10,6 +10,8 @@ export {
   type Band,
   type Reading,
 } from './display';
+export { buildEvidenceSet, type EvidenceSet, type Origin, type Support } from './evidence';
+export { numericCells, type Cell, type ToolResult } from './tool-result';
 export {
   add,
   compare,
