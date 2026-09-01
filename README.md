@@ -21,7 +21,8 @@ This repository is under active development. What works today:
 | Runtime (Redis, background tasks, shutdown, CPU pool)   | Working and verified |
 | Authentication (register, sign-in, sessions, isolation) | Working and verified |
 | Web client (shell, dev proxy, layer boundaries)         | Working and verified |
-| Chat (conversations, streaming, grounding, budget)      | Not built yet        |
+| Conversations (rail, history, delete pipeline)          | Working and verified |
+| Chat (asking, streaming, grounding, budget)             | Not built yet        |
 
 The commands below are the ones that run today. This section will grow as
 features land.
