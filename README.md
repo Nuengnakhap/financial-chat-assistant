@@ -114,6 +114,7 @@ packages/contracts/  Every HTTP body and SSE event, shared by API and web
 packages/grounding/  What a figure means and what the results prove — see its README
 packages/config/     Environment parsing and typed configuration
 data/                SQL dump, grants and indexes for the financial dataset
+evals/               The grounding quality gate — see its README
 infra/               Docker Compose stack and database bootstrap scripts
 scripts/             Seeding and verification
 tools/               Lint rules and the tests that prove the boundary rules work

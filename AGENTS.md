@@ -119,9 +119,8 @@ pnpm eval             # deterministic grounding suite (CI gate)
 pnpm lint             # eslint + dependency-cruiser + knip
 ```
 
-`pnpm test:e2e` and `pnpm eval` are the two entries that do not exist yet: they
-arrive with the rest of the grounding milestone. Everything else in this list
-runs today.
+`pnpm test:e2e` is the one entry that does not exist yet. Everything else in
+this list runs today.
 
 ## Definition of done for a change
 
