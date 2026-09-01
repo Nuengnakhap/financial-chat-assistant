@@ -1,6 +1,16 @@
 /** The public surface. A deep import couples the caller to a file layout free to change. */
 
 export {
+  NUMERIC_LITERAL,
+  bandOf,
+  contains,
+  formatUsd,
+  readNumeric,
+  valueOf,
+  type Band,
+  type Reading,
+} from './display';
+export {
   add,
   compare,
   divide,
