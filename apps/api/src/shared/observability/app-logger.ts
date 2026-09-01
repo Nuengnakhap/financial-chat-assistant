@@ -17,6 +17,14 @@ export interface LogContext {
   readonly scope?: string;
   /** The name a background task registered under, never its input. */
   readonly task?: string;
+  /**
+   * A digest of the SQL a query ran, never the SQL: the statement says which
+   * company somebody asked about, and a log line outlives the reason it was
+   * kept. Enough to recognise the same query twice, and not enough to read it.
+   */
+  readonly sqlDigest?: string;
+  /** How many rows something returned. A count, not any of their contents. */
+  readonly rows?: number;
   readonly err?: Error;
 }
 

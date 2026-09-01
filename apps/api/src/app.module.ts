@@ -5,9 +5,12 @@ import { APP_FILTER } from '@nestjs/core';
 import { TaskRegistry } from './bootstrap/task-registry';
 import { ConversationModule } from './conversation/conversation.module';
 import { ConversationDeletionSubscriber } from './conversation/infrastructure/conversation-deletion.subscriber';
+import { GenerationModule } from './generation/generation.module';
 import { IdentityModule } from './identity/identity.module';
 import { APP_CONFIG } from './shared/config/app-config.token';
 import { CpuModule } from './shared/cpu/cpu.module';
+import { FinancialQueryPool } from './shared/financial/financial-query.pool';
+import { FinancialModule } from './shared/financial/financial.module';
 import { HEALTH_INDICATORS, READINESS_TIMEOUT_MS } from './shared/health/health-indicator';
 import { HealthController } from './shared/health/health.controller';
 import { ReadinessProbe } from './shared/health/readiness';
@@ -30,9 +33,14 @@ import { RedisService } from './shared/redis/redis.service';
   imports: [
     PersistenceModule,
     RedisModule,
+    // Imported here as well as by the context that queries through it, because
+    // readiness below asks it a question and a factory can only inject what its
+    // own module can see.
+    FinancialModule,
     CpuModule,
     IdentityModule,
     ConversationModule,
+    GenerationModule,
     QueueModule,
   ],
   controllers: [HealthController],
@@ -52,12 +60,20 @@ import { RedisService } from './shared/redis/redis.service';
     ReadinessProbe,
     TaskRegistry,
     // What "ready" means, stated in one place: a request cannot be served
-    // without either of these. Listing them here rather than letting each module
-    // provide the token is what stops a second list from silently replacing the first.
+    // without any of these. Listing them here rather than letting each module
+    // provide the token is what stops a second list from silently replacing the
+    // first. The financial connection is a third one rather than a duplicate of
+    // the first: it is the same server but a different role, and a password or a
+    // grant that is wrong for `llm_reader` is invisible to the other check until
+    // somebody asks a question.
     {
       provide: HEALTH_INDICATORS,
-      useFactory: (database: DatabaseService, redis: RedisService) => [database, redis],
-      inject: [DatabaseService, RedisService],
+      useFactory: (
+        database: DatabaseService,
+        redis: RedisService,
+        financial: FinancialQueryPool,
+      ) => [database, redis, financial],
+      inject: [DatabaseService, RedisService, FinancialQueryPool],
     },
     { provide: READINESS_TIMEOUT_MS, useValue: 1_000 },
     // Who consumes which domain event, stated in one place for the same reason

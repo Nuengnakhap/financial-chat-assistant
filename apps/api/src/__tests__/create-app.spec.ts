@@ -75,7 +75,11 @@ describe('the real composition root', () => {
     // own indicator list would leave one of them silently unused.
     const indicators = app.get<readonly HealthIndicator[]>(HEALTH_INDICATORS);
 
-    expect(indicators.map((indicator) => indicator.name).toSorted()).toEqual(['postgres', 'redis']);
+    expect(indicators.map((indicator) => indicator.name).toSorted()).toEqual([
+      'financial-data',
+      'postgres',
+      'redis',
+    ]);
   });
 
   it('answers an unmatched route through the filter bound in the module', async () => {
