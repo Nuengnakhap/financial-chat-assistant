@@ -24,10 +24,13 @@ export type Context = 'prose' | 'table' | 'chart';
  * dataset's coverage is a different question with its own answer in the report
  * (`out_of_coverage`), and it needs the catalog, which this package does not have.
  *
- * `rank` is deliberately the narrowest rule here: the leading cell of a table
- * row, holding a bare integer no larger than the number of rows in that table.
- * A count in prose stays a `figure`, because `COUNT(*)` puts one in the results
- * and the difference between 48 and 49 companies is the whole point.
+ * `rank` is a position rather than an amount, and it is recognised two ways:
+ * the leading cell of a table row holding a bare integer no larger than that
+ * table's row count, or a bare integer wearing an ordinal suffix — "the 3rd
+ * largest". Both are shapes, not guesses about meaning.
+ *
+ * A bare count in prose stays a `figure`, because `COUNT(*)` puts one in the
+ * results and the difference between 48 and 49 companies is the whole point.
  */
 export type Role = 'figure' | 'year' | 'rank';
 
@@ -55,6 +58,7 @@ export interface NumericLiteral {
 const EARLIEST_YEAR = 1900n;
 const LATEST_YEAR = 2099n;
 
+const ORDINAL_SUFFIX = /^(?:st|nd|rd|th)\b/iu;
 const TABLE_ROW = /^\s*\|/u;
 const TABLE_DELIMITER = /^\s*\|[\s:|-]+\|\s*$/u;
 const FENCE = /^\s*```/u;
@@ -163,18 +167,46 @@ function isYear(found: Found): boolean {
   );
 }
 
-function isRank(found: Found, line: Line): boolean {
+function inLeadingCell(found: Found, line: Line): boolean {
   return (
-    isBareInteger(found) &&
     cellIndexAt(line, found.column) === 0 &&
     found.reading.ticks >= 1n &&
     found.reading.ticks <= BigInt(line.tableRows)
   );
 }
 
+/**
+ * "the 3rd largest". The suffix is what makes it a position rather than an
+ * amount, and no figure this system produces ever carries one — so unlike the
+ * bare count beside it, this one can be recognised by its shape alone.
+ *
+ * Grouping separators are allowed here where `isBareInteger` refuses them,
+ * because `2,023rd` is a position however it is punctuated. What is still
+ * refused is a currency marker, a percent sign or a decimal point: `$5th` is not
+ * an ordinal, and neither is anything with a fraction.
+ */
+function isOrdinal(found: Found, line: Line): boolean {
+  return (
+    found.reading.kind === 'plain' &&
+    found.reading.step.numerator === 1n &&
+    found.reading.step.denominator === 1n &&
+    ORDINAL_SUFFIX.test(line.text.slice(found.column + found.text.length))
+  );
+}
+
+function isRank(found: Found, line: Line): boolean {
+  return isOrdinal(found, line) || (isBareInteger(found) && inLeadingCell(found, line));
+}
+
+/**
+ * Rank is settled before year, because an ordinal suffix is the more definite
+ * signal of the two: `2023rd` is a position that happens to be spelled like a
+ * year, and reading it as a year would let it through as structure without the
+ * catalog ever seeing it. A year never wears a suffix, so nothing is lost.
+ */
 function roleOf(found: Found, line: Line): Role {
-  if (isYear(found)) return 'year';
-  return isRank(found, line) ? 'rank' : 'figure';
+  if (isRank(found, line)) return 'rank';
+  return isYear(found) ? 'year' : 'figure';
 }
 
 function literalsIn(line: Line): NumericLiteral[] {

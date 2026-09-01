@@ -125,6 +125,31 @@ describe('which numbers are claims about the data', () => {
   it('does not treat a pipe-free line as a table', () => {
     expect(only('1 of them').role).toBe('figure');
   });
+
+  it('allows an ordinal in prose, which no amount here ever wears', () => {
+    expect(only('Apple was the 4th largest by revenue.').role).toBe('rank');
+    expect(only('It came 1st.').role).toBe('rank');
+    expect(only('The 22nd row.').role).toBe('rank');
+  });
+
+  it('still checks the bare count beside it', () => {
+    // "the top 3 companies" is a claim about how many there were; "the 3rd
+    // company" is a position. Only the suffix separates them.
+    expect(only('the top 3 companies').role).toBe('figure');
+  });
+
+  it('reads an ordinal spelled like a year as the position it is', () => {
+    // The suffix is the more definite signal. Letting the year rule win would
+    // pass "the 2023rd" through as structure, unchecked by anything.
+    expect(only('the 2023rd entry').role).toBe('rank');
+    expect(only('the 2,023rd entry').role).toBe('rank');
+    expect(only('covering 2023 alone').role).toBe('year');
+  });
+
+  it('does not call a sum of money an ordinal', () => {
+    expect(only('it cost $5th of the total').role).toBe('figure');
+    expect(only('a 1.5th share').role).toBe('figure');
+  });
 });
 
 describe('where in the answer a figure was written', () => {
