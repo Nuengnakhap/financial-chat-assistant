@@ -59,8 +59,14 @@ suggestions.
 
 **The direction is editorial.** Structure comes from hairlines, white space and
 type — not from cards, fills and shadows. The depth scale is declared and left
-empty, so there is no `shadow-*` utility at all and a component cannot reach for
-one: a surface is set apart by its rule and by the space around it. Radii are
+almost empty: it holds one step, `--shadow-overlay`, and the two things that
+genuinely float use it — a row menu and a modal, each drawn over the surface it
+belongs to, where a hairline alone leaves it ambiguous which of the two is on
+top. Everything else is set apart by its rule and by the space around it, which
+is why the scale is closed rather than merely short. Radii are
+near-square for the same reason. An input is a label above a line rather than a
+box, and an alert is a rule and a sentence rather than a tinted panel — a failed
+sign-in should not be the loudest thing on the page it is about. Radii are
 near-square for the same reason. An input is a label above a line rather than a
 box, and an alert is a rule and a sentence rather than a tinted panel — a failed
 sign-in should not be the loudest thing on the page it is about.
@@ -106,6 +112,11 @@ ring, because neither is a claim about data. The single saturated hue is
 `--color-verified-soft`, and the badge that counts them — so that a link, a
 button and a heading never borrow the colour that means "this number was checked
 against the query result".
+
+A modal lays `--color-scrim` over the page, and that token is the one colour
+with its alpha baked in and no dark override. `--color-ink` inverts between
+themes, so a veil built from it would dim a light page and wash a dark one out;
+a scrim is one decision rather than a colour and an opacity kept in step.
 
 ## Three rules this package exists to hold
 

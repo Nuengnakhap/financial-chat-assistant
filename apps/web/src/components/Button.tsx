@@ -1,8 +1,8 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ComponentPropsWithRef } from 'react';
 
 import { cx } from '@/utils/cx';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 type ButtonSize = 'sm' | 'md';
 
 /**
@@ -17,6 +17,12 @@ const VARIANT: Record<ButtonVariant, string> = {
   // not what tells anyone the control is there. An empty input has nothing but
   // its edge, which is why `Field` uses the stronger one.
   secondary: 'border border-line bg-surface text-text hover:bg-raised',
+  // A variant rather than `text-negative` passed in by a caller: two utilities
+  // setting the same property are decided by their order in the stylesheet,
+  // which Tailwind chooses, not by the order they were written in — so an
+  // override wins or loses by luck. The shape is `secondary`'s, because a fill
+  // would be a second one in an interface whose only fill is `ink`.
+  danger: 'border border-line bg-surface text-negative hover:bg-raised',
   ghost: 'text-muted hover:bg-raised hover:text-text',
 };
 
@@ -25,7 +31,12 @@ const SIZE: Record<ButtonSize, string> = {
   md: 'px-6 py-3 text-body-sm',
 };
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+/**
+ * `ComponentPropsWithRef` rather than the attributes alone: React 19 hands `ref`
+ * to a function component as an ordinary prop, and anything that has to point at
+ * a button — a menu measuring where to open — needs it to be in the type.
+ */
+export interface ButtonProps extends ComponentPropsWithRef<'button'> {
   readonly variant?: ButtonVariant;
   readonly size?: ButtonSize;
 }

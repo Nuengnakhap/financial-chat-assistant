@@ -48,6 +48,16 @@ describe('Button', () => {
     expect(submit).toHaveBeenCalledTimes(1);
   });
 
+  it('says a destructive action in red without inventing a red fill', () => {
+    // A variant rather than a class passed in: two utilities setting the same
+    // property are decided by their order in the stylesheet, so an override
+    // wins or loses by luck.
+    render(<Button variant="danger">Delete</Button>);
+
+    expect(screen.getByRole('button')).toHaveClass('text-negative');
+    expect(screen.getByRole('button')).not.toHaveClass('bg-negative');
+  });
+
   it('paints the primary variant with ink, the only near-black fill', () => {
     render(<Button variant="primary">Sign in</Button>);
 

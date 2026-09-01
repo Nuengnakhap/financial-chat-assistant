@@ -53,6 +53,12 @@
   --color-verified: oklch(0.42 0.105 168);
   --color-verified-soft: oklch(0.955 0.022 168);
 
+  /* What a modal lays over the page. Always dark and never overridden below:
+     `ink` inverts between themes, so a scrim built from it would dim a light
+     page and wash a dark one out. Carried in the colour with an alpha, because
+     a veil is one decision rather than a colour and an opacity to keep in step. */
+  --color-scrim: oklch(0 0 0 / 0.5);
+
   --color-negative: oklch(0.475 0.185 25);
   --color-warning: oklch(0.55 0.13 65);
   --color-positive: oklch(0.46 0.115 155);
@@ -150,6 +156,16 @@
      thing that will genuinely float — a dialog — adds its own shadow in the
      slice that introduces it, and has to justify it there. */
   --shadow-*: initial;
+
+  /* The one exception the paragraph above said would have to justify itself.
+     It covers both things that genuinely float — a menu and a modal. Each is
+     drawn over the surface it belongs to, and a hairline alone leaves it
+     ambiguous which of the two is on top. Two
+     stops rather than one — a tight contact shadow so the edge reads, and a wide
+     soft one so the lift does. It stays black in dark mode on purpose: on a dark
+     surface a shadow does almost nothing and the border is what separates the
+     two, which is why there is no second value below. */
+  --shadow-overlay: 0 1px 2px oklch(0 0 0 / 0.06), 0 8px 24px oklch(0 0 0 / 0.12);
 
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
