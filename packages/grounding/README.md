@@ -20,6 +20,8 @@ reproduced from a fixture without a network, a database or a model.
 | `judgement.ts`   | What one figure turns out to be — the single rule both callers ask      |
 | `verify.ts`      | The whole answer, judged once, as a `GroundingReport`                   |
 | `gate.ts`        | The filter the answer is written through, one delta at a time           |
+| `repair.ts`      | What to do with a draft that failed, and what to tell the model         |
+| `fallback.ts`    | The answer of last resort, assembled from the rows alone                |
 
 Import from the package root (`@fca/grounding`). Deep imports are not part of the
 public surface and the file layout is free to change underneath them.
@@ -99,6 +101,23 @@ whole layer exists to avoid — so while no query has run, the tail of the answe
 is held back far enough for that sentence to finish inside it. The easy version
 of this, holding everything whenever nothing was queried, is the wrong one: a
 clarifying question claims nothing and should flow.
+
+**Giving up is a designed outcome, not a missing one.** A draft that fails is
+told exactly which figures failed and why, and asked again — twice, because a
+model that has had precise feedback twice is failing at something being told does
+not reach. After that the reader still gets the figures: a table built from the
+rows themselves, with a sentence saying there is no summary around it. That is
+what makes the guarantee total rather than likely. There is no path where an
+unchecked figure reaches a reader, because the path that gives up shows only
+rows — and that table is put through the same verifier the drafts were, so an
+answer this package wrote is not exempt from the rule it exists to enforce. When
+even the table fails, what is offered is a sentence with no figures in it. The
+last resort has a last resort.
+
+The repair instruction names the failures and stops there. It could carry the
+right value — the evidence knows it — and deliberately does not: the report is a
+text and a reason by design, and a system that fills in the correct figure and
+then calls the model's output verified has verified nothing.
 
 **A refusal to check is stated, not hidden.** Two checks that sound obvious
 cannot be decided from text without being wrong more often than right, so each is
