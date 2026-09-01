@@ -168,6 +168,7 @@ module.exports = {
           '^packages/[^/]+/src/index[.]ts$', // package entry points
           '[.]config[.](js|cjs|mjs|ts|mts|cts)$',
           '^scripts/', // operator-run entry points, invoked from package.json
+          '^evals/[^/]+[.]eval[.]ts$', // the eval runner, invoked by vitest
           '^apps/[^/]+/src/main[.]ts$', // process entry points
           '^apps/[^/]+/worker-threads/', // loaded by filename on a thread, never imported
           '(^|/)__tests__/.*[.]cjs$', // the same, for the workers a test stands up

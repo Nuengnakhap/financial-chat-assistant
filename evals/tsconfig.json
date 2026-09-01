@@ -1,0 +1,14 @@
+{
+  // The grounding eval. Outside the solution build: nothing here is emitted, and
+  // it consumes `@fca/grounding` through its published entry point exactly as
+  // the API will, so a break in that surface shows up here too.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

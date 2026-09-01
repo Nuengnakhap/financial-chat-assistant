@@ -74,6 +74,17 @@ export default defineConfig({
         },
       },
       {
+        // The grounding quality gate. Deterministic — recorded query results, no
+        // model and no database — so it belongs in `pnpm test` rather than
+        // beside the integration suite, and runs on every change.
+        test: {
+          name: 'eval',
+          root: './evals',
+          environment: 'node',
+          include: ['**/*.eval.ts'],
+        },
+      },
+      {
         test: {
           name: 'architecture',
           root: './tools',

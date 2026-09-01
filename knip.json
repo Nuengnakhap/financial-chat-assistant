@@ -2,8 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.mjs", "tools/**/*.spec.ts"],
-      "project": ["scripts/**/*.mjs", "tools/**/*.{ts,mjs}"],
+      "entry": ["scripts/*.mjs", "tools/**/*.spec.ts", "evals/**/*.eval.ts"],
+      "project": ["scripts/**/*.mjs", "tools/**/*.{ts,mjs}", "evals/**/*.ts"],
       "ignore": ["tools/architecture/fixtures/**"],
       "ignoreUnresolved": ["src/__tests__/global-setup.ts", "./vitest.setup.ts"]
     },

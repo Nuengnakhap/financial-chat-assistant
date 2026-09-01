@@ -17,7 +17,7 @@
     "build": "tsc -b",
     "dev": "pnpm build && pnpm -r --parallel --if-present dev",
     "build:clean": "tsc -b --clean",
-    "typecheck": "tsc -p tools/tsconfig.json --noEmit && pnpm -r --if-present typecheck",
+    "typecheck": "tsc -p tools/tsconfig.json --noEmit && tsc -p evals/tsconfig.json --noEmit && pnpm -r --if-present typecheck",
     "lint": "pnpm lint:code && pnpm lint:deps && pnpm lint:dead",
     "lint:code": "eslint .",
     "lint:deps": "depcruise packages apps tools scripts eslint.config.mjs vitest.config.mts",
@@ -29,11 +29,14 @@
     "test:coverage": "vitest run --coverage",
     "check": "pnpm build && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
     "test:integration": "vitest run --project integration",
+    "eval": "vitest run --project eval --reporter=verbose",
     "db:migrate": "pnpm --filter @fca/api db:migrate",
     "db:generate": "pnpm --filter @fca/api db:generate"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@fca/contracts": "workspace:*",
+    "@fca/grounding": "workspace:*",
     "@types/node": "^22.20.1",
     "@vitest/coverage-v8": "4.1.11",
     "dependency-cruiser": "^18.2.0",
