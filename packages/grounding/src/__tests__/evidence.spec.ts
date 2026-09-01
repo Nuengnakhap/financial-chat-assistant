@@ -209,15 +209,16 @@ describe('values a reader expects the answer to derive', () => {
     const wide: ToolResult = {
       toolCallId: 'call_8',
       columns: ['a', 'b', 'c', 'd'],
-      rows: Array.from({ length: 200 }, (_, row) =>
+      rows: Array.from({ length: 50 }, (_, row) =>
         ['a', 'b', 'c', 'd'].map((_column, index) => String(row * 4 + index + 1)),
       ),
     };
 
     const evidence = buildEvidenceSet([wide]);
 
-    // 800 cells, one row count, and two totals per column — not 640,000 pairs.
-    expect(evidence.size).toBe(809);
+    // Fifty rows is the ceiling the query policy writes into every statement.
+    // 200 cells, one row count and two totals per column — not 40,000 pairs.
+    expect(evidence.size).toBe(209);
   });
 });
 

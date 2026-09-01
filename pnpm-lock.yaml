@@ -77,6 +77,9 @@ importers:
       '@fca/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@fca/grounding':
+        specifier: workspace:*
+        version: link:../../packages/grounding
       '@nestjs/common':
         specifier: 11.2.3
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
@@ -110,6 +113,9 @@ importers:
       pg:
         specifier: ^8.23.0
         version: 8.23.0
+      pgsql-parser:
+        specifier: ^18.2.6
+        version: 18.2.6
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -1526,6 +1532,12 @@ packages:
     resolution: {integrity: sha512-UqGPmo56KDfLlfXFAFIrNflHT8tFxWGEivWg3Zeyp4Uy2NlKN1FGPr6/BxcLGG3+kZ6Wp14g5Uj+n71boqZfiw==}
     cpu: [x64]
     os: [win32]
+
+  '@pgsql/quotes@18.2.4':
+    resolution: {integrity: sha512-muCDdPu/bM/f9d7IquBNfkMgiRPehv6vvjdhSMxXeVKwJKPX9xIscDu11ju15s7UeEXoWntE8zrSaR9wQ9wgCg==}
+
+  '@pgsql/types@18.0.0':
+    resolution: {integrity: sha512-jtAY4JU7jdVYZ/Vv3zlZqVP+FRWZokyCLKPPCnAApiaJAElpyyiMC3HRiquBu29kSrVs+rkqZD50SUIb/zyEGw==}
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
@@ -3071,6 +3083,9 @@ packages:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
 
+  libpg-query@18.1.4:
+    resolution: {integrity: sha512-6jF9qn9ln4yLnmSF+bS/DBvAfNcPhGI05+pkQy+n3cRd3p9aO8LWjquEin8SLO0k7zYk745ZGBXYUiL9AUI7gA==}
+
   light-my-request@6.6.0:
     resolution: {integrity: sha512-CHYbu8RtboSIoVsHZ6Ye4cj4Aw/yg2oAFimlF7mNvfDV192LR7nDiKtSIfCuLT7KokPSTn/9kfVLm5OGN0A28A==}
 
@@ -3446,6 +3461,12 @@ packages:
 
   pgpass@1.0.5:
     resolution: {integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==}
+
+  pgsql-deparser@18.3.6:
+    resolution: {integrity: sha512-JJOkNr3JqKNEqmf0mBb7/2HAU9kh75AX81oB6ppstFuLVeVBYoWfSgnZVSmMWRgwtjEnYL2+IUpk/Ir7fvceTg==}
+
+  pgsql-parser@18.2.6:
+    resolution: {integrity: sha512-PC/d/Ht0cpBSnA4aYd/UOf9YV1pgKFnX70xfIRC6r30SvzTLgnLs0iR5BlMZrQrBeiKnL3pc7yDvIJjTi0isfw==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -5052,6 +5073,10 @@ snapshots:
   '@oxc-resolver/binding-win32-x64-msvc@11.24.2':
     optional: true
 
+  '@pgsql/quotes@18.2.4': {}
+
+  '@pgsql/types@18.0.0': {}
+
   '@pinojs/redact@0.4.0': {}
 
   '@pkgjs/parseargs@0.11.0':
@@ -6527,6 +6552,10 @@ snapshots:
       prelude-ls: 1.2.1
       type-check: 0.4.0
 
+  libpg-query@18.1.4:
+    dependencies:
+      '@pgsql/types': 18.0.0
+
   light-my-request@6.6.0:
     dependencies:
       cookie: 1.1.1
@@ -6869,6 +6898,17 @@ snapshots:
   pgpass@1.0.5:
     dependencies:
       split2: 4.2.0
+
+  pgsql-deparser@18.3.6:
+    dependencies:
+      '@pgsql/quotes': 18.2.4
+      '@pgsql/types': 18.0.0
+
+  pgsql-parser@18.2.6:
+    dependencies:
+      '@pgsql/types': 18.0.0
+      libpg-query: 18.1.4
+      pgsql-deparser: 18.3.6
 
   picocolors@1.1.1: {}
 

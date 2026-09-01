@@ -63,7 +63,8 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
 
 Node 22.9+ · **TypeScript 6.0** · NestJS 11 on Fastify · Vite 8 + React 19 ·
 Drizzle ORM 0.45 + drizzle-kit · PostgreSQL 18 · Redis 8 · zod 4 ·
-openai SDK (OpenAI-compatible via `OPENAI_BASE_URL`) · BullMQ · vitest 4 ·
+openai SDK (OpenAI-compatible via `OPENAI_BASE_URL`) · pgsql-parser 18 · BullMQ ·
+vitest 4 · fast-check 4 ·
 ESLint 10 + typescript-eslint 8 · dependency-cruiser 18 · knip 6 ·
 Playwright · testcontainers.
 

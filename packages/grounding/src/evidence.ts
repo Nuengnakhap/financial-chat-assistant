@@ -230,8 +230,8 @@ function lowerBound(sorted: readonly Support[], value: Quantity): number {
 
 /**
  * Sorted once at build time so a claim costs a binary search rather than a scan
- * of every value. A 200-row result is the widest the query policy allows, and
- * the set stays bounded by it.
+ * of every value. Fifty rows is the widest result the query policy allows — it
+ * writes that ceiling into the statement — and the set stays bounded by it.
  */
 export function buildEvidenceSet(results: readonly ToolResult[]): EvidenceSet {
   const sorted = results

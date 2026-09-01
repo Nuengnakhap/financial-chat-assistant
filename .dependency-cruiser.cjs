@@ -19,6 +19,12 @@ const FRAMEWORKS = [
   'fastify',
   '@fastify/.+',
   'openai',
+  // The PostgreSQL parser. `packages/grounding` reasons about query results and
+  // must never reason about SQL: parsing it is a decision about what may run,
+  // and that belongs to the one adapter that owns the policy.
+  'pgsql-parser',
+  'pgsql-deparser',
+  'libpg-query',
 ];
 
 const TEST_CODE = '[.](spec|test)[.]tsx?$|(^|/)__tests__/';
