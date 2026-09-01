@@ -16,6 +16,8 @@ reproduced from a fixture without a network, a database or a model.
 | `tool-result.ts` | A query result in the shape the model was shown it                      |
 | `evidence.ts`    | What the results prove, and where each thing was proved                 |
 | `claims.ts`      | Which figures in an answer are claims about the data, and which are not |
+| `coverage.ts`    | What the dataset holds, as much of it as deciding a figure needs        |
+| `verify.ts`      | The whole answer, judged once, as a `GroundingReport`                   |
 
 Import from the package root (`@fca/grounding`). Deep imports are not part of the
 public surface and the file layout is free to change underneath them.
@@ -68,6 +70,26 @@ two amounts, which are cells. Pairwise differences and growth rates stop being
 precomputed above twelve rows, where a result is a table somebody reads rather
 than a comparison somebody narrates, because every extra value in the set is
 another interval a fabricated figure could land in by chance.
+
+**A refusal to check is stated, not hidden.** Two checks that sound obvious
+cannot be decided from text without being wrong more often than right, so each is
+reduced to the part that can be, and the reduction is written down beside the
+code rather than left as a gap somebody later reads as an oversight. Company
+coverage is not checked in prose, because
+"Berkshire Hathaway's 2023 net income is not available in this dataset" names a
+company outside the catalog and is the correct answer — and the guarantee holds
+anyway, since a company outside it returns no rows and any figure attributed to
+one has nothing supporting it. A chart plotted under the wrong label is likewise
+invisible here: every number in it is real and only the pairing is wrong, which
+needs the chart's structure rather than the numbers in it.
+
+**Every reason is one a repair round can act on.** `no_evidence` and
+`value_mismatch` are not two words for the same failure: a figure one display
+string away from a real value is a misread digit and can be corrected, while one
+near nothing at all was invented, and asking for an adjustment there would invite
+a second guess. `unit_mismatch` is what stops `$2,023` finding its evidence in
+the year column beside the money. `out_of_coverage` is what a year the dataset
+does not hold gets instead of being called a missing figure.
 
 ## Tests
 
