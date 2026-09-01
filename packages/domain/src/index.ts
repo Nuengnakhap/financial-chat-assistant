@@ -70,3 +70,4 @@ export {
   type GenerationPhase,
 } from './generation/generation-phase.machine';
 export { MicroUsd, type Rounding } from './money/micro-usd.vo';
+export { CanonicalSql } from './sql/canonical-sql.vo';

@@ -10,6 +10,23 @@ import localTokens from './tools/eslint/no-off-token-styles.mjs';
 import local from './tools/eslint/todo-requires-issue.mjs';
 
 /**
+ * Shared so the block below can add one selector without restating these two:
+ * a later `no-restricted-syntax` replaces the earlier value rather than merging
+ * with it, and a rule silently dropped that way is the kind of thing nobody
+ * notices until it fails to catch something.
+ */
+const restrictedSyntax = [
+  {
+    selector: 'TSEnumDeclaration',
+    message: 'Use a union of string literals: an enum emits runtime code and is not closed.',
+  },
+  {
+    selector: 'TSTypeReference > TSQualifiedName[left.name="ts"]',
+    message: 'Compiler-internal types do not belong in application code.',
+  },
+];
+
+/**
  * The conventions in AGENTS.md, expressed wherever a linter can express them.
  * Anything this file cannot enforce is deliberately not a convention.
  */
@@ -62,17 +79,7 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'TSEnumDeclaration',
-          message: 'Use a union of string literals: an enum emits runtime code and is not closed.',
-        },
-        {
-          selector: 'TSTypeReference > TSQualifiedName[left.name="ts"]',
-          message: 'Compiler-internal types do not belong in application code.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...restrictedSyntax],
 
       // --- Async discipline ---
       '@typescript-eslint/no-floating-promises': 'error',
@@ -108,6 +115,31 @@ export default tseslint.config(
       ],
       'import-x/no-cycle': 'error',
       'import-x/no-duplicates': 'error',
+    },
+  },
+
+  {
+    // `CanonicalSql.__fromPolicy` is how validated SQL becomes executable, and
+    // the AST policy is the only thing that has validated anything. The private
+    // constructor stops a `CanonicalSql` being built by accident; this stops one
+    // being built on purpose somewhere that skipped the walk, which no type can.
+    files: ['**/*.{ts,tsx}'],
+    ignores: [
+      'apps/api/src/generation/infrastructure/pg-ast-sql-policy.ts',
+      'packages/domain/src/sql/**',
+      '**/__tests__/**',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedSyntax,
+        {
+          selector: 'MemberExpression[property.name="__fromPolicy"]',
+          message:
+            'Only the AST SQL policy may mint a CanonicalSql. Everywhere else, obtain one by ' +
+            'running the policy — that is what the type is for.',
+        },
+      ],
     },
   },
 
