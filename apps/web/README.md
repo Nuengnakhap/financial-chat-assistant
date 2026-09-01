@@ -16,7 +16,8 @@ src/
 ├── layouts/                 the frame a page sits in
 ├── components/              presentational primitives; no domain reaches them
 ├── domains/                 one folder per capability
-│   └── auth/                api/ components/ hooks/ utils/, and an index.ts
+│   ├── auth/                api/ components/ hooks/ utils/, and an index.ts
+│   └── conversation/        the rail, the thread, and what deletes one
 ├── lib/                     api client, http, theme — knows no domain
 ├── config/                  values with no logic in them
 └── utils/                   pure helpers
@@ -64,9 +65,6 @@ genuinely float use it — a row menu and a modal, each drawn over the surface i
 belongs to, where a hairline alone leaves it ambiguous which of the two is on
 top. Everything else is set apart by its rule and by the space around it, which
 is why the scale is closed rather than merely short. Radii are
-near-square for the same reason. An input is a label above a line rather than a
-box, and an alert is a rule and a sentence rather than a tinted panel — a failed
-sign-in should not be the loudest thing on the page it is about. Radii are
 near-square for the same reason. An input is a label above a line rather than a
 box, and an alert is a rule and a sentence rather than a tinted panel — a failed
 sign-in should not be the loudest thing on the page it is about.
@@ -180,6 +178,29 @@ A failure arrives as `ApiError` carrying the server's own wording, its code and
 its status — the API writes messages for people, so repeating that job here
 would only produce a second, worse copy. `NetworkError` is separate because "no
 answer" and "a refusal" are different things to say.
+
+## The conversation surface
+
+A list is read by keyset: the rail and a conversation's history are both
+infinite queries whose page parameter is the opaque cursor the server handed
+back. The rail is keyed `['conversations']` and a history `['conversations', id,
+'messages']`, which is a hierarchy worth having and one accident waiting inside
+it — invalidating the rail by prefix re-reads every open thread, including the
+one belonging to the conversation just deleted, which the server answers 404
+because it is right to. Every invalidation of the rail is therefore `exact`.
+
+Deleting is optimistic: the row leaves the rail on confirmation, because the
+server answers 202 and the conversation is gone from every read by then. A
+failure puts it back. The mutation belongs to the list rather than to the row —
+the row is what the deletion removes, so a callback passed to `mutate` from
+inside it is never called, which is how the page showing that conversation was
+once left sitting there after the conversation had gone.
+
+A conversation opens at its end. The pages arrive newest-first and each page
+reads oldest-first inside itself, so the chunks are reversed and their contents
+are not; the newest message is then scrolled to, once per conversation and never
+when an older page arrives, because loading what came before must not throw the
+reader back to the bottom of it.
 
 **Effects clean up.** Every subscription, timer and request is created with an
 `AbortController` and aborted on unmount. This is not hypothetical tidiness:

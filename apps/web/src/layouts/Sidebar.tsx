@@ -1,16 +1,15 @@
-import { NavLink } from 'react-router';
+import { NavLink, useNavigate } from 'react-router';
 
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { useSession, useSignOut } from '@/domains/auth';
+import { ConversationList, useCreateConversation } from '@/domains/conversation';
 import { messageFor } from '@/lib/api/errors';
 import { cx } from '@/utils/cx';
 
 /**
  * The rail beside the conversation: what you can start, what you have already
- * asked, and who you are. Starting and listing are both disabled here and say
- * why — a control that is present and refuses is honest, where one that is
- * present and silent is a bug the reader has to rule out.
+ * asked, and who you are.
  */
 export function Sidebar() {
   const session = useSession();
@@ -19,14 +18,10 @@ export function Sidebar() {
 
   return (
     <nav className="flex w-rail shrink-0 flex-col justify-between border-r border-line px-4 py-4">
-      <div className="flex flex-col gap-4">
-        <Button disabled title="Asking arrives with the conversation milestone">
-          New chat
-        </Button>
+      <div className="flex min-h-0 flex-col gap-4">
+        <NewChat />
         <p className="font-mono text-micro tracking-wide text-muted uppercase">Conversations</p>
-        <p className="text-body-sm text-muted">
-          Nothing here yet. Asking arrives with the milestone after this one.
-        </p>
+        <ConversationList />
       </div>
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
@@ -52,5 +47,33 @@ export function Sidebar() {
         {signOut.isError && <Alert tone="negative">{messageFor(signOut.error)}</Alert>}
       </div>
     </nav>
+  );
+}
+
+/**
+ * Starting one and opening it are the same act, so the button does both — a new
+ * conversation left in the rail for someone to find would be a second step for
+ * no reason. The failure stays under the button: there is nowhere else to go.
+ */
+function NewChat() {
+  const create = useCreateConversation();
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Button
+        disabled={create.isPending}
+        onClick={() => {
+          create.mutate(undefined, {
+            onSuccess: (conversation) => {
+              void navigate(`/c/${conversation.id}`);
+            },
+          });
+        }}
+      >
+        New chat
+      </Button>
+      {create.isError && <Alert tone="negative">{messageFor(create.error)}</Alert>}
+    </div>
   );
 }

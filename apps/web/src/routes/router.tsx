@@ -51,6 +51,7 @@ export function AppScreens() {
           </Route>
           <Route element={<Protected />}>
             <Route path="/" element={<ChatPage />} />
+            <Route path="/c/:id" element={<ChatPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
