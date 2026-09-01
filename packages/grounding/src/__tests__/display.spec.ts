@@ -134,8 +134,9 @@ describe('what a literal is worth', () => {
   });
 
   it('derives the half-point tolerance of a percentage rather than stipulating it', () => {
-    // `09 §6.2` calls for ±0.05 points. Nothing here says 0.05: it is half a tick
-    // of a number written to one decimal, which is the same rule money uses.
+    // A percentage written to one decimal is accepted within ±0.05 points.
+    // Nothing in the code says 0.05: it is half a tick of a number written to one
+    // decimal, which is the same rule money is held to, arrived at the same way.
     const band = bandFor('384.9%');
     expect(toApproximateNumber(band.low)).toBeCloseTo(384.85, 10);
     expect(toApproximateNumber(band.high)).toBeCloseTo(384.95, 10);
