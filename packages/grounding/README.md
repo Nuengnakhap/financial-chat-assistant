@@ -17,7 +17,9 @@ reproduced from a fixture without a network, a database or a model.
 | `evidence.ts`    | What the results prove, and where each thing was proved                 |
 | `claims.ts`      | Which figures in an answer are claims about the data, and which are not |
 | `coverage.ts`    | What the dataset holds, as much of it as deciding a figure needs        |
+| `judgement.ts`   | What one figure turns out to be — the single rule both callers ask      |
 | `verify.ts`      | The whole answer, judged once, as a `GroundingReport`                   |
+| `gate.ts`        | The filter the answer is written through, one delta at a time           |
 
 Import from the package root (`@fca/grounding`). Deep imports are not part of the
 public surface and the file layout is free to change underneath them.
@@ -70,6 +72,33 @@ two amounts, which are cells. Pairwise differences and growth rates stop being
 precomputed above twelve rows, where a result is a table somebody reads rather
 than a comparison somebody narrates, because every extra value in the set is
 another interval a fabricated figure could land in by chance.
+
+**The gate and the verifier cannot disagree, by construction.** Checking a
+finished answer is too late to be the guarantee — by then an unsupported figure
+has been on somebody's screen, and correcting it afterwards does not unsee it. So
+the gate decides each figure the moment it is complete and holds it until then.
+That only works if the two readings agree, and they are not two readings: there
+is one `judge`, and the gate and the verifier differ solely in _when_ they call
+it. The gate releases text only once the extractor's reading of it can no longer
+change, so where a delta happened to begin or end is invisible to it. A property
+test cuts an answer into two thousand different chunkings and gets the same bytes
+out every time, but the reason it passes is the design, not the test.
+
+Two shapes need more than a line before they can be read: a table, because a
+number in its leading cell is a rank only if it falls inside the row count the
+table ends up having, and a fenced block, because a fence means whatever its
+closing line says it meant. Both are held whole. Neither renders half-finished
+anyway, so the hold costs a reader nothing — but it does mean the "at most a few
+characters held" promise applies to prose and not to those.
+
+**A figure is not the only thing that can be a claim.** Saying this dataset
+cannot answer is one too, and one made without running a query rests on nothing
+that happened. A gate watching only numbers would let "…is not availabl" appear
+on screen and leave the verifier to object afterwards, which is the failure this
+whole layer exists to avoid — so while no query has run, the tail of the answer
+is held back far enough for that sentence to finish inside it. The easy version
+of this, holding everything whenever nothing was queried, is the wrong one: a
+clarifying question claims nothing and should flow.
 
 **A refusal to check is stated, not hidden.** Two checks that sound obvious
 cannot be decided from text without being wrong more often than right, so each is
