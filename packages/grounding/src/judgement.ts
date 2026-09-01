@@ -113,6 +113,13 @@ export function judge(
 const UNAVAILABLE =
   /\bnot available\b|\bno data\b|\bdoes not (?:include|contain|have)\b|\bnot in (?:this|the) dataset\b/iu;
 
+/**
+ * The longest of those phrases is eighteen characters. A caller deciding as text
+ * arrives has to keep at least that much back, or it will have shown the reader
+ * "…is not availabl" before the sentence finishes saying it.
+ */
+export const REFUSAL_REACH = 24;
+
 export interface Refusal {
   readonly violation: Violation;
   /** Where the phrase begins, so a stream can stop short of it. */

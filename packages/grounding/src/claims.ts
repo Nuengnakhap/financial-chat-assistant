@@ -234,3 +234,46 @@ function literalsIn(line: Line): NumericLiteral[] {
 export function extractNumericClaims(markdown: string): readonly NumericLiteral[] {
   return scan(markdown).flatMap((line) => literalsIn(line));
 }
+
+/**
+ * How far into a line the reading of it can no longer change, given that more
+ * characters may still arrive. Everything before this point means what it will
+ * always mean; everything after it is a figure that might still be growing.
+ *
+ * It lives beside the extractor because it is the same knowledge read from the
+ * other side, and the two must not drift: the reach below covers the longest
+ * suffix a literal can take (` trillion`) and the ordinal one after it, so a
+ * literal ending within that distance of the end is still open.
+ */
+const SUFFIX_REACH = 12;
+
+/** A sign or currency marker that has not met its digits yet. */
+const PARTIAL_GUARD = 2;
+
+export function settledPrefixOf(line: string): number {
+  const matches = [...line.matchAll(ALL_LITERALS)];
+  const last = matches.at(-1);
+  if (last !== undefined && last.index + last[0].length + SUFFIX_REACH > line.length) {
+    // Cutting at a literal's start is always safe to re-read from: the pattern
+    // refuses to begin one after a digit or a point, so the character before it
+    // can never have been part of a number.
+    return last.index;
+  }
+
+  return Math.max(0, line.length - PARTIAL_GUARD);
+}
+
+/** A line that opens or closes a fenced block. */
+export function isFenceLine(line: string): boolean {
+  return FENCE.test(line);
+}
+
+/** A line that could belong to a table — whether it does depends on its neighbours. */
+export function isTableRowLine(line: string): boolean {
+  return TABLE_ROW.test(line);
+}
+
+/** A partial line that has not ruled out becoming a fence. */
+export function couldOpenFence(line: string): boolean {
+  return /^\s*`/u.test(line);
+}

@@ -30,4 +30,5 @@ export {
 export { numericCells, type Cell, type ToolResult } from './tool-result';
 export { coversYear, type ColumnKind, type Coverage } from './coverage';
 export { verify } from './verify';
+export { openGate, type Gate, type GateEvent } from './gate';
 export { judge, type Judgement } from './judgement';
