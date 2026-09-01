@@ -79,6 +79,36 @@ describe('running a Lua script', () => {
   });
 });
 
+describe('reading and writing JSON', () => {
+  it('brings back what was written', async () => {
+    const key = K.queryCache('json-round-trip');
+
+    await service.writeJson(key, { rows: [['Apple', '1']] }, 60);
+
+    expect(await service.readJson(key)).toEqual({ rows: [['Apple', '1']] });
+  });
+
+  it('reads a key that is not there as nothing', async () => {
+    expect(await service.readJson(K.queryCache('never-written'))).toBeNull();
+  });
+
+  it('reads a key holding something that is not JSON as nothing', async () => {
+    // A caller can do nothing different about the two, and both mean the value
+    // has to be produced again.
+    const key = K.queryCache('not-json');
+    await admin.set(key, 'this was never JSON');
+
+    expect(await service.readJson(key)).toBeNull();
+  });
+
+  it('lets a written key expire', async () => {
+    const key = K.queryCache('with-a-ttl');
+    await service.writeJson(key, { rows: [] }, 60);
+
+    expect(await admin.ttl(key)).toBeGreaterThan(0);
+  });
+});
+
 describe('readiness', () => {
   it('passes while the server answers', async () => {
     await expect(service.check()).resolves.toBeUndefined();

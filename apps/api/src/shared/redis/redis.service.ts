@@ -58,6 +58,28 @@ export class RedisService implements OnModuleDestroy, HealthIndicator {
     }
   }
 
+  /**
+   * `null` for a key that is not there and for one holding something that is not
+   * JSON, because a caller can do nothing different about the two: both mean the
+   * value has to be produced again. The result is `unknown` on purpose — whoever
+   * asked for it knows what shape it should be, and Redis is a boundary where
+   * that has to be checked rather than assumed.
+   */
+  async readJson(key: RedisKey): Promise<unknown> {
+    const stored = await this.client.get(key);
+    if (stored === null) return null;
+
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  }
+
+  async writeJson(key: RedisKey, value: unknown, ttlSeconds: number): Promise<void> {
+    await this.client.set(key, JSON.stringify(value), 'EX', ttlSeconds);
+  }
+
   async check(): Promise<void> {
     await this.client.ping();
   }
