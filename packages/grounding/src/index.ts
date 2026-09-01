@@ -32,3 +32,9 @@ export { coversYear, type ColumnKind, type Coverage } from './coverage';
 export { verify } from './verify';
 export { openGate, type Gate, type GateEvent } from './gate';
 export { judge, type Judgement } from './judgement';
+export {
+  MAX_DRAFTS,
+  buildRepairInstruction,
+  decideAfterVerification,
+  type RepairDecision,
+} from './repair';
