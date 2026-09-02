@@ -63,6 +63,17 @@
   --color-warning: oklch(0.55 0.13 65);
   --color-positive: oklch(0.46 0.115 155);
 
+  /* Series in a chart, and nothing else. Four rather than a palette, because the
+     schema stops at six series and past four a legend is a list nobody reads —
+     the table beside it is better. They are spaced far apart in hue and stay
+     apart under deuteranopia, and each is set again below so a dark page is not
+     four dark colours on a dark ground. Nothing outside a chart may use them:
+     the one saturated hue this interface has means "verified". */
+  --color-chart-1: oklch(0.55 0.13 250);
+  --color-chart-2: oklch(0.6 0.135 45);
+  --color-chart-3: oklch(0.55 0.12 300);
+  --color-chart-4: oklch(0.58 0.11 190);
+
   /* ─── spacing ───────────────────────────────────────────────────────────
      A 4px rhythm, ten steps, plus zero. The gaps in the sequence are the point: a scale
      with every number in it is a scale nobody can hold in their head, and it is
@@ -196,6 +207,11 @@
   --color-negative: oklch(0.73 0.16 25);
   --color-warning: oklch(0.82 0.13 70);
   --color-positive: oklch(0.78 0.13 155);
+
+  --color-chart-1: oklch(0.72 0.13 250);
+  --color-chart-2: oklch(0.76 0.13 45);
+  --color-chart-3: oklch(0.72 0.12 300);
+  --color-chart-4: oklch(0.75 0.11 190);
 }
 
 @layer base {
@@ -224,6 +240,22 @@
   ::selection {
     background-color: var(--color-verified-soft);
     color: var(--color-text);
+  }
+}
+
+/* ─── motion ──────────────────────────────────────────────────────────────
+   One animation, declared here for the same reason every colour is: a value
+   invented at a call site is a decision nobody can find again. It steps rather
+   than fading, because a caret that fades is a caret that looks like it is
+   still drawing. The reduced-motion block above stops it without this file
+   having to say so twice. */
+@theme {
+  --animate-caret: caret 1s steps(2, start) infinite;
+}
+
+@keyframes caret {
+  to {
+    opacity: 0;
   }
 }
 
