@@ -17,7 +17,7 @@ src/
 │   └── shutdown.ts          the order things stop in
 ├── conversation/            bounded context: conversations and their messages
 ├── identity/                bounded context: password hashing, tokens, sessions
-├── generation/              bounded context: the SQL policy, the query tool, the catalog, the model
+├── generation/              bounded context: the policy, the tool, the catalog, the model, the runner
 └── shared/
     ├── async/               the one place a timeout is written
     ├── cache/               LayeredCache: memory, Redis, and one call to the source
@@ -34,7 +34,7 @@ src/
 
 `budget/` lands as it is built, split into `domain`, `application`,
 `infrastructure` and `presentation`; `generation/` has the first two of those so
-far — the runner and the stream are the phases after this one.
+far — the durable stream and the HTTP surface are the phases after this one.
 
 A layer may only depend inwards and a context may not import another's internals
 — both enforced by `.dependency-cruiser.cjs`, with fixtures in
@@ -179,6 +179,36 @@ tool — plenty of OpenAI-compatible endpoints hold a conversation perfectly and
 ignore `tools`, and nothing else notices until the first question comes back
 ungrounded. What it finds is logged and held, not made a readiness condition, for
 the reason readiness gives above.
+
+**One question can take more than one draft, and every draft is read before
+anyone else sees it.** The runner puts the pieces in a loop: the model writes, the
+tool answers, the claim gate reads every character as it streams, and the
+verifier reads the finished draft. A figure with nothing behind it ends the draft
+where it stands — the request is aborted rather than paid for to the end — and
+the model is told which figure and asked again. Three drafts is the limit; after
+that the answer is assembled from the rows themselves and verified like any
+other.
+
+What the reader has already seen is always safe to discard, because everything
+released has been checked. That is why a repair is a `draft_reset` and not a
+correction: there is nothing to correct, only something not to have said.
+
+`GenerationPhase` in `@fca/domain` drives it rather than decorating it, and it
+refuses things. There is no edge from `streaming` to `repairing`: a draft is only
+rewritten by way of `verifying`, which is the machine insisting that nothing is
+rewritten except because something read it. Every path leaves through `settling`
+into `closed`, which is what guarantees no generation finishes holding a budget
+reservation.
+
+When something outside breaks — a refused key, a closed circuit, a socket that
+will not open — the sentence a person reads is chosen from a code, and what the
+provider actually said goes to the log in the one file that knows there is a
+provider. The two never swap places.
+
+Evidence belongs to one generation. History is replayed as text and never as old
+tool results, so a figure from an earlier answer has nothing supporting it here
+and the model has to ask again — which, measured against the real model, is
+exactly what it does.
 
 **A list is read by keyset, never by offset.** `OFFSET n` reads n rows in order
 to throw them away, and the rows move underneath whoever is reading: a
