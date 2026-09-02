@@ -43,3 +43,7 @@ const element: Partial<Element> = Element.prototype;
 element.scrollIntoView ??= function scrollIntoView(): void {
   // Nothing to scroll: jsdom has no viewport.
 };
+
+element.scrollTo ??= function scrollTo(): void {
+  // As above: a conversation following its own end is a question about layout.
+};

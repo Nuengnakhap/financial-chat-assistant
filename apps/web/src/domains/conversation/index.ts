@@ -5,5 +5,5 @@
  * it rather than trusting the convention.
  */
 export { ConversationList } from './components/ConversationList';
-export { MessageThread } from './components/MessageThread';
+export { ChatRoom } from './components/ChatRoom';
 export { useCreateConversation } from './api/conversations';

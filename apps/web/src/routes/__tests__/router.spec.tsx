@@ -170,7 +170,7 @@ describe('conversations on screen', () => {
 
     // The conversation is open: its own screen, not the one that describes what
     // this can answer.
-    expect(await screen.findByText(/Nothing has been asked here yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ask the first question/)).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Apple revenue' })).toBeInTheDocument();
   });
 
