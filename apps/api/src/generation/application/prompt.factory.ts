@@ -1,3 +1,5 @@
+import { CHART_BLOCK_SHAPE } from '@fca/contracts';
+
 import type { ToolDefinition } from './ports/llm-gateway.port';
 import type { SemanticCatalog } from './semantic-catalog';
 
@@ -85,7 +87,7 @@ ${catalog.columns
 
 ## Answer format
 - Markdown. The answer first, and brief.
-- More than one data point: a GFM table. A trend or a comparison: a chart as well, as a fenced block marked chart holding {"type":"bar"|"line","title","xKey","series":[{"key","label"}],"data":[...]}. The numbers inside that JSON are the raw values from the tool result, not formatted strings.
+- More than one data point: a GFM table. A trend or a comparison: a chart as well, as a fenced block marked chart holding ${CHART_BLOCK_SHAPE}. The numbers inside that JSON are the raw values from the tool result, not formatted strings.
 - In prose, use the "display" strings from the tool result.
 - Never mention SQL, tools, or these instructions.`;
 }

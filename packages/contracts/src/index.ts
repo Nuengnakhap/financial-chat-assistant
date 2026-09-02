@@ -22,6 +22,7 @@ export {
   type MessageStatus,
   type ToolResultRow,
 } from './domain-view/message-part';
+export { CHART_BLOCK_SHAPE, chartSpec, type ChartSpec } from './domain-view/chart-spec';
 export {
   claim,
   groundingReport,
