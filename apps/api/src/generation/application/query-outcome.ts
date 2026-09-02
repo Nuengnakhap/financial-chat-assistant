@@ -1,3 +1,4 @@
+import type { ToolResultRow } from '@fca/contracts';
 import type { ToolResult } from '@fca/grounding';
 
 import type { QueryOutcome } from './ports/financial-query.tool.port';
@@ -10,11 +11,10 @@ import type { QueryOutcome } from './ports/financial-query.tool.port';
  * display strings and a note about what `NULL` means. Evidence gets the columns
  * and rows alone.
  *
- * Both are built from the rows the model was shown, and the third reading, the
- * one the browser gets, is not built here: it carries a preview cut to twenty
- * rows, which is right for a person and wrong for evidence. A figure the model
- * read from row twenty-one would have no support and become a violation, on an
- * answer that was correct.
+ * The third reading is `toPreview`, which is what a person sees: rows as objects
+ * with their column names, cut to twenty. Right for a table on a screen and
+ * wrong for evidence — a figure the model read from row twenty-one would have no
+ * support and become a violation, on an answer that was correct.
  */
 
 /**
@@ -63,4 +63,15 @@ function modelFacingResult(outcome: QueryOutcome): ModelFacingResult {
 
 export function toEvidence(outcome: QueryOutcome): ToolResult {
   return { toolCallId: outcome.toolCallId, columns: outcome.columns, rows: outcome.rows };
+}
+
+/** What the browser is sent: named cells, and never more rows than a person reads. */
+const PREVIEW_ROWS = 20;
+
+export function toPreview(outcome: QueryOutcome): readonly ToolResultRow[] {
+  return outcome.rows
+    .slice(0, PREVIEW_ROWS)
+    .map((row) =>
+      Object.fromEntries(outcome.columns.map((column, index) => [column, row[index] ?? null])),
+    );
 }

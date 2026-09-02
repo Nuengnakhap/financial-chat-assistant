@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { AgentRunner } from './application/agent-runner';
+import { GenerationContextFactory } from './application/generation-context';
 import { LlmCapabilityService } from './application/llm-capability.service';
 import { CacheModule } from '../shared/cache/cache.module';
 import { APP_CONFIG } from '../shared/config/app-config.token';
@@ -44,7 +46,9 @@ import { SemanticCatalogBuilder } from './infrastructure/semantic-catalog.builde
     OpenAiLlmGateway,
     { provide: LLM_GATEWAY, useExisting: OpenAiLlmGateway },
     LlmCapabilityService,
+    GenerationContextFactory,
+    AgentRunner,
   ],
-  exports: [FINANCIAL_QUERY_TOOL, SQL_POLICY, LLM_GATEWAY, SemanticCatalogService],
+  exports: [FINANCIAL_QUERY_TOOL, SQL_POLICY, LLM_GATEWAY, SemanticCatalogService, AgentRunner],
 })
 export class GenerationModule {}
