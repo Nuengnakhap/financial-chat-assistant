@@ -122,6 +122,21 @@ export class DrizzleMessageRepository implements MessageRepository {
     return row === undefined ? null : toStored(row);
   }
 
+  /**
+   * No `OwnerScope` either, and for the same reason: a position is meaningless
+   * outside the conversation it counts within, which the caller has already
+   * proved is theirs.
+   */
+  async findBySeq(conversationId: ConversationId, seq: number): Promise<StoredMessage | null> {
+    const [row] = await this.db
+      .select(COLUMNS)
+      .from(messages)
+      .where(and(eq(messages.conversationId, conversationId), eq(messages.seq, seq)))
+      .limit(1);
+
+    return row === undefined ? null : toStored(row);
+  }
+
   async listForConversation(
     scope: OwnerScope,
     request: MessagePageRequest,

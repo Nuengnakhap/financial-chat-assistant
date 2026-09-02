@@ -11,13 +11,13 @@ import type { TxContext, UnitOfWork } from '../../../shared/persistence/unit-of-
 import { conversationCursor, messageCursor } from '../pagination';
 import type { ConversationRepository } from '../ports/conversation.repository';
 import type { MessageRepository } from '../ports/message.repository';
-import { AppendUserMessageUseCase } from '../use-cases/append-user-message.use-case';
 import { CreateConversationUseCase } from '../use-cases/create-conversation.use-case';
 import { DescribeConversationUseCase } from '../use-cases/describe-conversation.use-case';
 import { ListConversationsUseCase } from '../use-cases/list-conversations.use-case';
 import { ListMessagesUseCase } from '../use-cases/list-messages.use-case';
 import { PurgeConversationUseCase } from '../use-cases/purge-conversation.use-case';
 import { RemoveConversationUseCase } from '../use-cases/remove-conversation.use-case';
+import { StartGenerationUseCase } from '../use-cases/start-generation.use-case';
 
 const ADA = 'e5c9f4a1-1f0e-4a6a-9d4e-0c8b6a3f21d0' as UserId;
 const SCOPE: OwnerScope = { userId: ADA };
@@ -40,9 +40,11 @@ const touch = vi.fn();
 const listForConversation = vi.fn();
 const appendMessage = vi.fn();
 const findByClientId = vi.fn();
+const findBySeq = vi.fn();
 const messageRepository = (): MessageRepository => ({
   append: appendMessage,
   findByClientId,
+  findBySeq,
   listForConversation,
 });
 
@@ -289,14 +291,46 @@ describe('reading the history of a conversation', () => {
   });
 });
 
-describe('writing what somebody sent', () => {
+describe('starting an answer', () => {
   const CLIENT_ID = ClientMessageId.trusted('9b1e2f3a-4c5d-4e6f-8a9b-0c1d2e3f4a5b');
   const sent = { conversationId: ID, clientMessageId: CLIENT_ID, content: 'hello' };
-  const written = {
-    id: '2b8e1b4a-6a1e-4d5e-9c3f-0f1a2b3c4d5e',
-    seq: 1,
-    createdAt: NOW,
+  const question = { id: '2b8e1b4a-6a1e-4d5e-9c3f-0f1a2b3c4d5e', seq: 1, createdAt: NOW };
+  const answer = { id: '7f3c9d2e-5b4a-4c1d-8e6f-9a0b1c2d3e4f', seq: 2, createdAt: NOW };
+
+  /** The two rows one send writes, in the order the transaction writes them. */
+  const bothRowsWritten = (): void => {
+    appendMessage.mockResolvedValueOnce(question).mockResolvedValueOnce(answer);
   };
+
+  const start = () => new StartGenerationUseCase(uow).execute(SCOPE, sent);
+
+  it('writes the question, the row its answer goes in, and the event that starts one', async () => {
+    findById.mockResolvedValue(summary());
+    bothRowsWritten();
+
+    const started = await start();
+
+    expect(started.ok && started.value).toEqual({ assistantMessageId: answer.id, resumed: false });
+    // The placeholder is `generating` before anything reads it, which is what the
+    // partial unique index counts and what the janitor later looks for.
+    expect(appendMessage).toHaveBeenNthCalledWith(2, {
+      conversationId: ID,
+      clientMessageId: null,
+      role: 'assistant',
+      parts: [],
+      status: 'generating',
+    });
+    // Buffered by the same unit of work that wrote the rows: the runner cannot
+    // be told about an answer that was rolled back.
+    expect(published).toEqual([
+      {
+        aggregate: 'message',
+        aggregateId: answer.id,
+        type: 'generation.requested',
+        payload: { conversationId: ID, userId: ADA },
+      },
+    ]);
+  });
 
   it('answers not found when the conversation went while it was being written to', () => {
     // The delete pipeline can take the row away between the read and the write,
@@ -308,21 +342,48 @@ describe('writing what somebody sent', () => {
       violation('23503', 'messages_conversation_id_conversations_id_fk'),
     );
 
-    return expect(new AppendUserMessageUseCase(uow).execute(SCOPE, sent)).resolves.toMatchObject({
-      ok: false,
-      error: { code: 'not_found' },
-    });
+    return expect(start()).resolves.toMatchObject({ ok: false, error: { code: 'not_found' } });
   });
 
-  it('answers with the message it already wrote when the send is a repeat', async () => {
+  it('refuses a second question while the first is still being answered', async () => {
+    // G1 as a partial unique index, not as a read: two sends can both find no
+    // generation in progress, and only the constraint can settle which of them
+    // started one.
+    findById.mockResolvedValue(summary());
+    appendMessage
+      .mockResolvedValueOnce(question)
+      .mockRejectedValueOnce(violation('23505', 'uq_active_generation'));
+
+    const refused = await start();
+
+    expect(!refused.ok && refused.error.code).toBe('conflict');
+    expect(published).toEqual([]);
+  });
+
+  it('attaches a repeated send to the answer already being written for it', async () => {
     findById.mockResolvedValue(summary());
     appendMessage.mockRejectedValue(violation('23505', 'uq_message_client_id'));
-    findByClientId.mockResolvedValue(written);
+    findByClientId.mockResolvedValue(question);
+    findBySeq.mockResolvedValue(answer);
 
-    const again = await new AppendUserMessageUseCase(uow).execute(SCOPE, sent);
+    const again = await start();
 
-    expect(again.ok && again.value.created).toBe(false);
-    expect(again.ok && again.value.message.id).toBe(written.id);
+    expect(again.ok && again.value).toEqual({ assistantMessageId: answer.id, resumed: true });
+    // The link between a question and its answer is the position after it.
+    expect(findBySeq).toHaveBeenCalledWith(ID, question.seq + 1);
+    // Nothing new was started, so nothing new was announced.
+    expect(published).toEqual([]);
+  });
+
+  it('raises the conflict rather than inventing an answer nobody can find', async () => {
+    // The constraint says the row is there. If it is not, something is wrong
+    // that a made-up message id would hide.
+    findById.mockResolvedValue(summary());
+    appendMessage.mockRejectedValue(violation('23505', 'uq_message_client_id'));
+    findByClientId.mockResolvedValue(question);
+    findBySeq.mockResolvedValue(null);
+
+    await expect(start()).rejects.toThrow('Failed query');
   });
 
   it('raises anything else rather than dressing it as a missing conversation', async () => {
@@ -330,28 +391,27 @@ describe('writing what somebody sent', () => {
     findById.mockResolvedValue(summary());
     appendMessage.mockRejectedValue(violation('23514', 'chk_user_message_length'));
 
-    await expect(new AppendUserMessageUseCase(uow).execute(SCOPE, sent)).rejects.toThrow(
-      'Failed query',
-    );
+    await expect(start()).rejects.toThrow('Failed query');
   });
 
   it('names the conversation after the first message and leaves the rest alone', async () => {
     findById.mockResolvedValue(summary());
-    appendMessage.mockResolvedValue({ ...written, seq: 1 });
-    await new AppendUserMessageUseCase(uow).execute(SCOPE, sent);
+    bothRowsWritten();
+    await start();
     expect(touch).toHaveBeenCalledWith(SCOPE, { id: ID, at: NOW, title: 'hello' });
 
-    appendMessage.mockResolvedValue({ ...written, seq: 2 });
-    await new AppendUserMessageUseCase(uow).execute(SCOPE, sent);
+    appendMessage.mockResolvedValueOnce({ ...question, seq: 3 }).mockResolvedValueOnce(answer);
+    await start();
     expect(touch).toHaveBeenLastCalledWith(SCOPE, { id: ID, at: NOW, title: null });
   });
 
   it('writes nothing into a conversation that is not the sender to write in', async () => {
     findById.mockResolvedValue(null);
 
-    const refused = await new AppendUserMessageUseCase(uow).execute(SCOPE, sent);
+    const refused = await start();
 
     expect(!refused.ok && refused.error.code).toBe('not_found');
     expect(appendMessage).not.toHaveBeenCalled();
+    expect(published).toEqual([]);
   });
 });

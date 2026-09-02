@@ -54,6 +54,13 @@ export interface MessageRepository {
     clientMessageId: ClientMessageId,
   ): Promise<StoredMessage | null>;
   /**
+   * A position within a conversation, which is the only link between a question
+   * and the answer written for it: the two are appended in one transaction, so
+   * the answer is always the message after the question and nothing can land
+   * between them.
+   */
+  findBySeq(conversationId: ConversationId, seq: number): Promise<StoredMessage | null>;
+  /**
    * A conversation is read from its end: the first page is the newest messages,
    * and paging moves backwards through older ones — which is the direction
    * someone scrolls. Within a page the items are in reading order, oldest

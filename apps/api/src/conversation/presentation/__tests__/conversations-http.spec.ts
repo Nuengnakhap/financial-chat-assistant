@@ -1,6 +1,13 @@
 import fastifyCookie from '@fastify/cookie';
-import { apiFailure, conversationsContract, SESSION_COOKIE } from '@fca/contracts';
 import {
+  apiFailure,
+  conversationsContract,
+  messagesContract,
+  SESSION_COOKIE,
+} from '@fca/contracts';
+import {
+  ClientMessageId,
+  ConflictError,
   ConversationId,
   Err,
   NotFoundError,
@@ -26,8 +33,10 @@ import { DescribeConversationUseCase } from '../../application/use-cases/describ
 import { ListConversationsUseCase } from '../../application/use-cases/list-conversations.use-case';
 import { ListMessagesUseCase } from '../../application/use-cases/list-messages.use-case';
 import { RemoveConversationUseCase } from '../../application/use-cases/remove-conversation.use-case';
+import { StartGenerationUseCase } from '../../application/use-cases/start-generation.use-case';
 import { ConversationController } from '../conversation.controller';
 import { ConversationsController } from '../conversations.controller';
+import { MessagesController } from '../messages.controller';
 
 const ADA = UserId.trusted('e5c9f4a1-1f0e-4a6a-9d4e-0c8b6a3f21d0');
 const SESSION = SessionId.trusted('7c0be6ca-984d-40c9-93f6-a1d653f60210');
@@ -41,6 +50,7 @@ const create = { execute: vi.fn() };
 const describeOne = { execute: vi.fn() };
 const remove = { execute: vi.fn() };
 const history = { execute: vi.fn() };
+const startGeneration = { execute: vi.fn() };
 /**
  * The real guard runs, against the narrow capability it declares rather than
  * against a JWT — verifying one has its own spec, and this context could not
@@ -49,7 +59,7 @@ const history = { execute: vi.fn() };
 const verifyAccessToken = vi.fn();
 
 @Module({
-  controllers: [ConversationsController, ConversationController],
+  controllers: [ConversationsController, ConversationController, MessagesController],
   providers: [
     { provide: APP_CONFIG, useValue: testConfig() },
     {
@@ -61,6 +71,7 @@ const verifyAccessToken = vi.fn();
     { provide: DescribeConversationUseCase, useValue: describeOne },
     { provide: RemoveConversationUseCase, useValue: remove },
     { provide: ListMessagesUseCase, useValue: history },
+    { provide: StartGenerationUseCase, useValue: startGeneration },
     { provide: ACCESS_TOKEN_VERIFIER, useValue: { verifyAccessToken } },
     SessionGuard,
     { provide: APP_FILTER, useClass: DomainErrorFilter },
@@ -91,11 +102,13 @@ beforeEach(() => {
 async function call(
   method: 'GET' | 'POST' | 'DELETE',
   url: string,
+  payload?: Record<string, unknown>,
 ): Promise<LightMyRequestResponse> {
   const inject: InjectOptions = {
     method,
     url,
     cookies: { [SESSION_COOKIE.access]: 'a-token' },
+    ...(payload === undefined ? {} : { payload }),
   };
 
   return await app.getHttpAdapter().getInstance().inject(inject);
@@ -107,6 +120,7 @@ const ROUTES = [
   ['GET', `/api/v1/conversations/${ID}`],
   ['DELETE', `/api/v1/conversations/${ID}`],
   ['GET', `/api/v1/conversations/${ID}/messages`],
+  ['POST', `/api/v1/conversations/${ID}/messages`],
 ] as const;
 
 describe('the conversation routes', () => {
@@ -126,6 +140,7 @@ describe('the conversation routes', () => {
       [`GET /api/v1/conversations/${ID}`]: 401,
       [`DELETE /api/v1/conversations/${ID}`]: 401,
       [`GET /api/v1/conversations/${ID}/messages`]: 401,
+      [`POST /api/v1/conversations/${ID}/messages`]: 401,
     });
     // Not one of them reached a use case: the guard runs first.
     expect(list.execute).not.toHaveBeenCalled();
@@ -303,5 +318,77 @@ describe('the history of a conversation', () => {
     const response = await call('GET', `/api/v1/conversations/${ID}/messages`);
 
     expect(response.statusCode).toBe(404);
+  });
+});
+
+describe('asking a question', () => {
+  const ANSWER = '7f3c9d2e-5b4a-4c1d-8e6f-9a0b1c2d3e4f';
+  const CLIENT_ID = '9b1e2f3a-4c5d-4e6f-8a9b-0c1d2e3f4a5b';
+  const url = `/api/v1/conversations/${ID}/messages`;
+  const question = {
+    content: 'What was the revenue of Apple in 2024?',
+    clientMessageId: CLIENT_ID,
+  };
+
+  it('answers 202 with the path the client attaches to', async () => {
+    startGeneration.execute.mockResolvedValue(Ok({ assistantMessageId: ANSWER, resumed: false }));
+
+    const response = await call('POST', url, question);
+
+    expect(response.statusCode).toBe(202);
+    // Parsed by the contract's own schema, which insists the path starts with
+    // `/api/v1/` — so a path built by hand could not pass this.
+    expect(messagesContract.startGeneration.response.parse(response.json())).toEqual({
+      assistantMessageId: ANSWER,
+      streamPath: `/api/v1/messages/${ANSWER}/stream`,
+      resumed: false,
+    });
+    expect(startGeneration.execute).toHaveBeenCalledWith(
+      { userId: ADA },
+      {
+        conversationId: ID,
+        clientMessageId: ClientMessageId.trusted(CLIENT_ID),
+        content: question.content,
+      },
+    );
+  });
+
+  it('says a repeat was resumed rather than starting a second answer', async () => {
+    startGeneration.execute.mockResolvedValue(Ok({ assistantMessageId: ANSWER, resumed: true }));
+
+    const response = await call('POST', url, question);
+
+    expect(response.json()).toMatchObject({ resumed: true, assistantMessageId: ANSWER });
+  });
+
+  it('refuses a message the contract would not carry', async () => {
+    const response = await call('POST', url, { content: '', clientMessageId: CLIENT_ID });
+
+    expect(response.statusCode).toBe(400);
+    expect(startGeneration.execute).not.toHaveBeenCalled();
+  });
+
+  it('refuses a client message id that is not one', async () => {
+    const response = await call('POST', url, { content: 'hello', clientMessageId: 'not-a-uuid' });
+
+    expect(response.statusCode).toBe(400);
+    expect(startGeneration.execute).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for a conversation id that could not name one', async () => {
+    const response = await call('POST', '/api/v1/conversations/nonsense/messages', question);
+
+    expect(response.statusCode).toBe(404);
+    expect(startGeneration.execute).not.toHaveBeenCalled();
+  });
+
+  it('answers 409 while an answer is already being written', async () => {
+    startGeneration.execute.mockResolvedValue(Err(new ConflictError('already generating')));
+
+    const response = await call('POST', url, question);
+
+    expect(response.statusCode).toBe(409);
+    // The wording is the filter's, so nothing about a constraint reaches anyone.
+    expect(apiFailure.parse(response.json()).message).not.toContain('generating');
   });
 });
