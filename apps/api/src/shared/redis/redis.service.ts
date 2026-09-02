@@ -4,6 +4,18 @@ import { Redis } from 'ioredis';
 
 import type { RedisKey } from './keys';
 import type { LuaScript } from './lua-script';
+import {
+  STREAM_FIELD,
+  createChannelSubscriber,
+  createStreamReader,
+  toEntries,
+} from './redis-connections';
+import type {
+  ChannelSubscriber,
+  StreamEntry,
+  StreamReader,
+  StreamRetention,
+} from './stream-reader';
 import { APP_CONFIG } from '../config/app-config.token';
 import type { HealthIndicator } from '../health/health-indicator';
 import { AppLogger } from '../observability/app-logger';
@@ -12,19 +24,22 @@ import { AppLogger } from '../observability/app-logger';
 const MAX_RETRIES_PER_REQUEST = 1;
 
 /**
- * The only place that knows ioredis exists. Every command goes through a method
- * here, so a key never appears as a literal and the client can be replaced
- * without touching a use case.
+ * The way into Redis. Every command goes through a method here, so a key never
+ * appears as a literal and the client can be replaced without touching a use
+ * case; ioredis itself is known only to this file and `redis-connections.ts`,
+ * which holds the two clients that cannot be this one.
  */
 @Injectable()
 export class RedisService implements OnModuleDestroy, HealthIndicator {
   readonly name = 'redis';
   private readonly client: Redis;
+  private readonly url: string;
 
   constructor(
     @Inject(APP_CONFIG) config: AppConfig,
     private readonly logger: AppLogger,
   ) {
+    this.url = config.redis.url;
     // lazyConnect so an unreachable Redis makes the app report not-ready rather
     // than fail to boot — a process that cannot start cannot say why.
     this.client = new Redis(config.redis.url, {
@@ -78,6 +93,68 @@ export class RedisService implements OnModuleDestroy, HealthIndicator {
 
   async writeJson(key: RedisKey, value: unknown, ttlSeconds: number): Promise<void> {
     await this.client.set(key, JSON.stringify(value), 'EX', ttlSeconds);
+  }
+
+  /**
+   * One round trip for both, because this runs once per token: a stream that
+   * outlived its window is worse than one trimmed a little early, and a second
+   * call to set the expiry would double the cost of every delta.
+   *
+   * `MAXLEN ~` is approximate on purpose — exact trimming makes Redis walk the
+   * radix tree on every write, and the bound here is about memory rather than
+   * about a precise count.
+   */
+  async appendToStream(
+    key: RedisKey,
+    payload: string,
+    retention: StreamRetention,
+  ): Promise<string> {
+    const results = await this.client
+      .pipeline()
+      .xadd(key, 'MAXLEN', '~', retention.maxLength, '*', STREAM_FIELD, payload)
+      .expire(key, retention.ttlSeconds)
+      .exec();
+
+    const id: unknown = results?.[0]?.[1];
+    if (typeof id !== 'string') throw new Error('redis did not answer XADD with an id');
+
+    return id;
+  }
+
+  /** Everything after `afterId`, oldest first. Never blocks, so it costs no connection. */
+  async readStreamAfter(
+    key: RedisKey,
+    afterId: string,
+    count: number,
+  ): Promise<readonly StreamEntry[]> {
+    const rows: unknown = await this.client.xrange(key, `(${afterId}`, '+', 'COUNT', count);
+
+    return Array.isArray(rows) ? toEntries(rows) : [];
+  }
+
+  /** The id of the last thing written, or `0-0` for a stream nothing has written to. */
+  async endOfStream(key: RedisKey): Promise<string> {
+    const rows: unknown = await this.client.xrevrange(key, '+', '-', 'COUNT', 1);
+    const [last] = Array.isArray(rows) ? toEntries(rows) : [];
+
+    return last?.id ?? '0-0';
+  }
+
+  /** Fire and forget by design: nobody listening means nobody to tell. */
+  async publish(channel: RedisKey, message: string): Promise<void> {
+    await this.client.publish(channel, message);
+  }
+
+  createStreamReader(): StreamReader {
+    return createStreamReader(this.url, (error) => {
+      this.logger.debug('redis stream reader error', { scope: 'RedisService', err: error });
+    });
+  }
+
+  createChannelSubscriber(): ChannelSubscriber {
+    return createChannelSubscriber(this.url, (error) => {
+      this.logger.debug('redis subscriber error', { scope: 'RedisService', err: error });
+    });
   }
 
   async check(): Promise<void> {
