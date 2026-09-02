@@ -15,6 +15,8 @@ import { SQL_POLICY } from './application/ports/sql-policy.port';
 import { RunGenerationUseCase } from './application/run-generation.use-case';
 import { SemanticCatalogService } from './application/semantic-catalog.service';
 import { EndAbandonedGenerationsUseCase } from './application/use-cases/end-abandoned-generations.use-case';
+import { StopGenerationUseCase } from './application/use-cases/stop-generation.use-case';
+import { WatchGenerationUseCase } from './application/use-cases/watch-generation.use-case';
 import { CachedFinancialQuery } from './infrastructure/cached-financial-query';
 import { DrizzleGenerationMessages } from './infrastructure/drizzle-generation-messages';
 import { PgFinancialQueryTool } from './infrastructure/financial-query.tool';
@@ -28,10 +30,14 @@ import {
 import { PgAstSqlPolicy } from './infrastructure/pg-ast-sql-policy';
 import { RedisGenerationStops } from './infrastructure/redis-generation-stops';
 import { SemanticCatalogBuilder } from './infrastructure/semantic-catalog.builder';
+import { GenerationController } from './presentation/generation.controller';
+import { IdentityModule } from '../identity/identity.module';
 import { CacheModule } from '../shared/cache/cache.module';
 import { APP_CONFIG } from '../shared/config/app-config.token';
 import { CpuModule } from '../shared/cpu/cpu.module';
 import { FinancialModule } from '../shared/financial/financial.module';
+import { SessionGuard } from '../shared/http/session.guard';
+import { SseStream } from '../shared/http/sse-stream';
 import { PersistenceModule } from '../shared/persistence/persistence.module';
 import { RedisModule } from '../shared/redis/redis.module';
 import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
@@ -45,7 +51,15 @@ import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
  * controllers use it, and the token issuer it verifies with is bound there.
  */
 @Module({
-  imports: [FinancialModule, CacheModule, CpuModule, RedisModule, PersistenceModule],
+  imports: [
+    FinancialModule,
+    CacheModule,
+    CpuModule,
+    RedisModule,
+    PersistenceModule,
+    IdentityModule,
+  ],
+  controllers: [GenerationController],
   providers: [
     // `useExisting` rather than `useClass`: the policy loads a WebAssembly
     // module in `onModuleInit`, and two bindings of the same class would be two
@@ -76,8 +90,14 @@ import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
     GenerationSubscriber,
     EndAbandonedGenerationsUseCase,
     GenerationJanitor,
+    WatchGenerationUseCase,
+    StopGenerationUseCase,
+    SseStream,
+    SessionGuard,
   ],
-  // The subscriber leaves for the handler list the composition root builds.
-  exports: [FINANCIAL_QUERY_TOOL, SQL_POLICY, LLM_GATEWAY, GenerationSubscriber],
+  // `SseStream` leaves so that shutdown can tell every open reader to come back
+  // before the server stops accepting connections; the subscriber leaves for the
+  // handler list the composition root builds.
+  exports: [FINANCIAL_QUERY_TOOL, SQL_POLICY, LLM_GATEWAY, GenerationSubscriber, SseStream],
 })
 export class GenerationModule {}

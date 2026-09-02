@@ -10,6 +10,7 @@ import { TaskRegistry } from './bootstrap/task-registry';
 import { createApp } from './create-app';
 import { APP_CONFIG } from './shared/config/app-config.token';
 import { ReadinessProbe } from './shared/health/readiness';
+import { SseStream } from './shared/http/sse-stream';
 import { AppLogger, asError } from './shared/observability/app-logger';
 
 const SHUTDOWN_SIGNALS = ['SIGTERM', 'SIGINT'] as const;
@@ -33,6 +34,7 @@ async function bootstrap(): Promise<void> {
       void runShutdown({
         target: shutdownTargetFor(app),
         readiness: app.get(ReadinessProbe),
+        streams: app.get(SseStream),
         tasks: app.get(TaskRegistry),
         logger,
         timings: DEFAULT_SHUTDOWN_TIMINGS,

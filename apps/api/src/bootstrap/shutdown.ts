@@ -10,6 +10,11 @@ export interface Refusable {
   refuse(): void;
 }
 
+/** Only what the sequence needs from `SseStream`: the ability to let its readers go. */
+export interface Windable {
+  windDown(): Promise<void>;
+}
+
 export interface ShutdownTarget {
   /** Stops accepting connections and waits for the requests already in flight. */
   stopAcceptingRequests(): Promise<void>;
@@ -29,6 +34,7 @@ export interface ShutdownTimings {
 export interface ShutdownDeps {
   readonly target: ShutdownTarget;
   readonly readiness: Refusable;
+  readonly streams: Windable;
   readonly tasks: TaskRegistry;
   readonly logger: AppLogger;
   readonly timings: ShutdownTimings;
@@ -58,6 +64,7 @@ export const DEFAULT_SHUTDOWN_TIMINGS: ShutdownTimings = {
 export async function runShutdown({
   target,
   readiness,
+  streams,
   tasks,
   logger,
   timings,
@@ -67,6 +74,11 @@ export async function runShutdown({
   readiness.refuse();
   await delay(timings.readinessGraceMs);
 
+  // Before the server stops accepting, not after: an event stream is a request
+  // that never finishes on its own, so leaving them open would spend the whole
+  // connection-close budget waiting for readers that are not going to leave —
+  // and the steps that persist and settle come after that one.
+  await streams.windDown();
   await closeConnections(target, timings.connectionCloseTimeoutMs, logger);
   await tasks.drain(timings.drainTimeoutMs);
   await target.release();

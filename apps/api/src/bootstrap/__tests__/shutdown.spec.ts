@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { AppLogger, createPinoLogger } from '../../shared/observability/app-logger';
-import { runShutdown, type Refusable, type ShutdownTarget } from '../shutdown';
+import { runShutdown, type Refusable, type ShutdownTarget, type Windable } from '../shutdown';
 import { TaskRegistry } from '../task-registry';
 
 const TIMINGS = { readinessGraceMs: 0, connectionCloseTimeoutMs: 1_000, drainTimeoutMs: 1_000 };
@@ -9,6 +9,7 @@ const TIMINGS = { readinessGraceMs: 0, connectionCloseTimeoutMs: 1_000, drainTim
 interface Harness {
   steps: string[];
   readiness: Refusable & { accepting: boolean };
+  streams: Windable;
   tasks: TaskRegistry;
   target: ShutdownTarget;
   logger: AppLogger;
@@ -28,6 +29,12 @@ function harness(): Harness {
     steps,
     readiness,
     logger,
+    streams: {
+      windDown: () => {
+        steps.push('wind-down-streams');
+        return Promise.resolve();
+      },
+    },
     tasks: new TaskRegistry(logger),
     target: {
       stopAcceptingRequests: () => {
@@ -47,7 +54,7 @@ function harness(): Harness {
 
 describe('the shutdown sequence', () => {
   it('stops taking requests before it releases anything they depend on', async () => {
-    const { steps, readiness, tasks, target, logger } = harness();
+    const { steps, readiness, streams, tasks, target, logger } = harness();
     // Slow enough that it cannot have finished before the sequence starts,
     // which is what makes the order below an observation rather than a
     // coincidence of scheduling.
@@ -56,13 +63,13 @@ describe('the shutdown sequence', () => {
       steps.push('task-finished');
     });
 
-    await runShutdown({ target, readiness, tasks, logger, timings: TIMINGS });
+    await runShutdown({ target, readiness, streams, tasks, logger, timings: TIMINGS });
 
-    expect(steps).toEqual(['stop-accepting', 'task-finished', 'release']);
+    expect(steps).toEqual(['wind-down-streams', 'stop-accepting', 'task-finished', 'release']);
   });
 
   it('refuses readiness first, while everything still works', async () => {
-    const { readiness, tasks, logger } = harness();
+    const { readiness, tasks, logger, streams } = harness();
     let readyWhenConnectionsClosed: boolean | undefined;
 
     const target: ShutdownTarget = {
@@ -74,14 +81,14 @@ describe('the shutdown sequence', () => {
       release: () => Promise.resolve(),
     };
 
-    await runShutdown({ target, readiness, tasks, logger, timings: TIMINGS });
+    await runShutdown({ target, readiness, streams, tasks, logger, timings: TIMINGS });
 
     // A probe answered after this point must already say "do not send me traffic".
     expect(readyWhenConnectionsClosed).toBe(false);
   });
 
   it('lets a background task finish with its pools still open', async () => {
-    const { readiness, tasks, logger, target } = harness();
+    const { readiness, tasks, logger, target, streams } = harness();
     let releasedBeforeTaskFinished = false;
     let released = false;
 
@@ -92,6 +99,7 @@ describe('the shutdown sequence', () => {
 
     await runShutdown({
       readiness,
+      streams,
       tasks,
       logger,
       timings: TIMINGS,
@@ -108,12 +116,24 @@ describe('the shutdown sequence', () => {
     expect(released).toBe(true);
   });
 
+  it('lets its event streams go before it stops accepting connections', async () => {
+    const { steps, readiness, streams, tasks, target, logger } = harness();
+
+    await runShutdown({ target, readiness, streams, tasks, logger, timings: TIMINGS });
+
+    // The other order spends the whole connection-close budget waiting for
+    // readers that are never going to leave on their own, and the steps that
+    // persist and settle a generation all come after that one.
+    expect(steps.indexOf('wind-down-streams')).toBeLessThan(steps.indexOf('stop-accepting'));
+  });
+
   it('waits out the readiness grace before cutting traffic', async () => {
-    const { readiness, tasks, target, logger } = harness();
+    const { readiness, streams, tasks, target, logger } = harness();
     const started = Date.now();
 
     await runShutdown({
       target,
+      streams,
       readiness,
       tasks,
       logger,
@@ -126,11 +146,12 @@ describe('the shutdown sequence', () => {
 
 describe('when a connection will not close', () => {
   it('cuts it rather than letting one client hold the whole sequence open', async () => {
-    const { steps, readiness, tasks, logger, target } = harness();
+    const { steps, readiness, tasks, logger, target, streams } = harness();
     let finishClosing = (): void => undefined;
 
     await runShutdown({
       readiness,
+      streams,
       tasks,
       logger,
       timings: { ...TIMINGS, connectionCloseTimeoutMs: 20 },
@@ -148,14 +169,15 @@ describe('when a connection will not close', () => {
       },
     });
 
-    expect(steps).toEqual(['cut-connections', 'release']);
+    expect(steps).toEqual(['wind-down-streams', 'cut-connections', 'release']);
   });
 
   it('still releases the pools when even cutting does not help', async () => {
-    const { steps, readiness, tasks, logger, target } = harness();
+    const { steps, readiness, tasks, logger, target, streams } = harness();
 
     await runShutdown({
       readiness,
+      streams,
       tasks,
       logger,
       timings: { ...TIMINGS, connectionCloseTimeoutMs: 20 },
@@ -166,6 +188,6 @@ describe('when a connection will not close', () => {
     });
 
     // The pools are what a restart cannot recover on its own.
-    expect(steps).toEqual(['cut-connections', 'release']);
+    expect(steps).toEqual(['wind-down-streams', 'cut-connections', 'release']);
   }, 10_000);
 });
