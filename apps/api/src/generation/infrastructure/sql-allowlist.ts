@@ -114,6 +114,7 @@ export const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   'typeName',
   'names',
   'typemod',
+  'typmods',
   'SubLink',
   'subselect',
   'subLinkType',
@@ -123,6 +124,7 @@ export const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   'args',
   'agg_star',
   'agg_distinct',
+  'agg_filter',
   'funcformat',
   'over',
   'partitionClause',
@@ -143,9 +145,16 @@ export const ALLOWED_KEYS: ReadonlySet<string> = new Set([
  * allowed as structure and never reach this list. Listing them anyway would read
  * as though something depended on it.
  *
- * `upper` and `lower` are here and not in the plan's list. A model comparing a
- * company name case-insensitively is doing something reasonable, and the cost of
- * refusing it is a whole extra draft.
+ * The last six are not in the plan's list, and each is there because a model
+ * asked for it against the real prompt and lost a round being told no.
+ * `upper`/`lower` compare a name without minding its case; `first_value` is how
+ * "the change since 2022" is written when the baseline is a row rather than a
+ * constant; `power` and `sqrt` are how a compound growth rate is worked out.
+ *
+ * `greatest`, `least` and `string_agg` are still refused, and that is a
+ * judgement rather than an oversight: the first two are a parse node rather than
+ * a call, so allowing them would widen the *shapes* a query may have, and the
+ * third builds prose out of column values, which is the model's job.
  */
 export const ALLOWED_FUNCTIONS: ReadonlySet<string> = new Set([
   'sum',
@@ -160,6 +169,10 @@ export const ALLOWED_FUNCTIONS: ReadonlySet<string> = new Set([
   'row_number',
   'lag',
   'lead',
+  'first_value',
+  'last_value',
+  'power',
+  'sqrt',
   'upper',
   'lower',
 ]);

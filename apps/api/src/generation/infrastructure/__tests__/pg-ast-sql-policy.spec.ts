@@ -65,6 +65,16 @@ const MUST_ACCEPT: readonly string[] = [
   // A trailing semicolon is one statement, and adds `stmt_len` to the tree.
   "SELECT company FROM financial_data WHERE ticker = 'AAPL';",
   "SELECT upper(company) FROM financial_data WHERE lower(sector) = 'technology'",
+  // Every one of these was written by the model against the real prompt, and
+  // every one of them cost a round when it came back refused.
+  "SELECT year, revenue - first_value(revenue) OVER (ORDER BY year) AS growth FROM financial_data WHERE company = 'Apple'",
+  "SELECT last_value(revenue) OVER (ORDER BY year) FROM financial_data WHERE company = 'Apple'",
+  'SELECT company, power(revenue / 1000000000.0, 0.25) AS compound FROM financial_data',
+  'SELECT company, sqrt(revenue) FROM financial_data',
+  // A precision and a scale on the cast: the model writes `DECIMAL(20,2)` when
+  // it wants to divide two integers without losing the fraction.
+  'SELECT cast(revenue AS numeric(20, 2)) / 3 AS third FROM financial_data',
+  'SELECT sum(revenue) FILTER (WHERE year = 2024) AS revenue_2024 FROM financial_data',
   // `ONLY` says not to include inherited tables, of which there are none. It is
   // harmless, and refusing it would cost a whole draft to say so.
   'SELECT company FROM ONLY financial_data',
@@ -124,10 +134,14 @@ const MUST_REJECT: readonly (readonly [string, SqlRule])[] = [
   ["SELECT current_setting('is_superuser') FROM financial_data", 'function'],
   ['SELECT xmlelement(name foo) FROM financial_data', 'construct'],
   ["SELECT 'financial_data'::regclass FROM financial_data", 'type'],
-  ['SELECT revenue::numeric(10, 2) FROM financial_data', 'construct'],
   ['SELECT * FROM financial_data WHERE revenue > (SELECT max(revenue) FROM users)', 'table'],
   ['SELECT company FROM financial_data ORDER BY revenue COLLATE "C"', 'construct'],
   ['SELECT array_agg(company) FROM financial_data', 'function'],
+  // Refused on purpose rather than by omission: one builds prose out of column
+  // values, and the other is a parse node rather than a call, so allowing it
+  // would widen the shapes a query may have rather than the functions it uses.
+  ["SELECT string_agg(company, ', ') FROM financial_data", 'function'],
+  ['SELECT greatest(revenue, net_income) FROM financial_data', 'construct'],
   ['SELECT company FROM financial_data GROUP BY GROUPING SETS ((company))', 'construct'],
   ['SELECT company FROM financial_data WINDOW w AS (ORDER BY year)', 'construct'],
   ['SELECT $1 FROM financial_data', 'construct'],
@@ -279,6 +293,14 @@ describe('the columns that hold amounts', () => {
     ['SELECT coalesce(gross_profit, 0) FROM financial_data', ['coalesce']],
     ['SELECT revenue::numeric FROM financial_data', ['revenue']],
     ['SELECT lag(revenue) OVER (ORDER BY year) FROM financial_data', ['lag']],
+    [
+      "SELECT first_value(revenue) OVER (ORDER BY year) FROM financial_data WHERE company = 'Apple'",
+      ['first_value'],
+    ],
+    ['SELECT sum(revenue) FILTER (WHERE year = 2024) AS total FROM financial_data', ['total']],
+    // The square root of an amount is a number, not an amount.
+    ['SELECT sqrt(revenue) FROM financial_data', []],
+    ['SELECT power(revenue, 2) FROM financial_data', []],
     ['SELECT year - 1 AS previous FROM financial_data', []],
     ['SELECT row_number() OVER (ORDER BY revenue) AS position FROM financial_data', []],
     ['SELECT upper(company) FROM financial_data', []],

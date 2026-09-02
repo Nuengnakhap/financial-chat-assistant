@@ -28,7 +28,11 @@ export interface ResultColumn {
   readonly unit: Unit;
 }
 
-/** Functions that return their first argument's unit. `count` is not one of them. */
+/**
+ * Functions that return their first argument's unit. `count` is not one of them,
+ * and neither are `power` and `sqrt`: the square root of an amount is a number,
+ * and `$25.8` would be a lie about it.
+ */
 const UNIT_PRESERVING: ReadonlySet<string> = new Set([
   'sum',
   'avg',
@@ -38,6 +42,8 @@ const UNIT_PRESERVING: ReadonlySet<string> = new Set([
   'abs',
   'lag',
   'lead',
+  'first_value',
+  'last_value',
 ]);
 
 const ADDITIVE: ReadonlySet<string> = new Set(['+', '-']);
