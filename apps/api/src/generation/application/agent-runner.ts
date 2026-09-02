@@ -80,6 +80,7 @@ export class AgentRunner {
       return;
     }
 
+    yield { type: 'generation_started', model: context.model };
     yield* this.generate(request, context, signal);
   }
 

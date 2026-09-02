@@ -21,7 +21,7 @@ const CATALOG: SemanticCatalog = {
   fingerprint: 'abc123',
 };
 
-const CONFIG = { llm: { maxOutputTokens: 1_500 } } as AppConfig;
+const CONFIG = { llm: { maxOutputTokens: 1_500, model: 'a-model' } } as AppConfig;
 
 function factoryFor(catalog: SemanticCatalog | null): GenerationContextFactory {
   const service = { current: () => catalog } as unknown as SemanticCatalogService;
@@ -44,6 +44,7 @@ describe('what a generation is told before it starts', () => {
         ]),
       },
       maxOutputTokens: 1_500,
+      model: CONFIG.llm.model,
       fingerprint: 'abc123',
     });
   });

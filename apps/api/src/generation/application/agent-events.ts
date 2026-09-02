@@ -15,6 +15,8 @@ import type { GenerationOutcome } from '@fca/domain';
  * in this list carries a figure a person will read as an answer.
  */
 export type AgentEvent =
+  /** First of every generation that gets as far as asking the model anything. */
+  | { readonly type: 'generation_started'; readonly model: string }
   | { readonly type: 'text_delta'; readonly delta: string }
   /** The model writing a query, a fragment at a time, before it can be run. */
   | { readonly type: 'tool_call_delta'; readonly index: number; readonly argsDelta: string }

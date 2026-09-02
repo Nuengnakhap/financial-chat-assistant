@@ -21,6 +21,8 @@ export interface GenerationContext {
   readonly systemPrompt: string;
   readonly coverage: Coverage;
   readonly maxOutputTokens: number;
+  /** Announced to the client as the generation starts, and stored with the answer. */
+  readonly model: string;
   /** Which reading of the dataset this is, for a log line or a cache key. */
   readonly fingerprint: string;
 }
@@ -47,6 +49,7 @@ export class GenerationContextFactory {
       systemPrompt: renderSystemPrompt(catalog),
       coverage: coverageOf(catalog),
       maxOutputTokens: this.config.llm.maxOutputTokens,
+      model: this.config.llm.model,
       fingerprint: catalog.fingerprint,
     };
   }

@@ -35,6 +35,7 @@ const CONTEXT: GenerationContext = {
   systemPrompt: 'the rules',
   coverage: COVERAGE,
   maxOutputTokens: 900,
+  model: 'a-model',
   fingerprint: 'abc',
 };
 
@@ -148,17 +149,30 @@ function fakeTool(...outcomes: QueryOutcome[]): FakeTool {
   return fake;
 }
 
-function runnerWith(gateway: FakeGateway, tool: FakeTool, context = CONTEXT): AgentRunner {
+function runnerWith(
+  gateway: FakeGateway,
+  tool: FakeTool,
+  context: GenerationContext | null = CONTEXT,
+): AgentRunner {
   const contexts = { current: () => context } as unknown as GenerationContextFactory;
   return new AgentRunner(gateway.gateway, tool.tool, contexts);
 }
 
 const QUESTION: GenerationRequest = { question: "Apple's revenue?", history: [] };
 
-async function collect(events: AsyncGenerator<AgentEvent>): Promise<AgentEvent[]> {
+/** Everything, including the opening event that `collect` drops. */
+async function collectAll(events: AsyncGenerator<AgentEvent>): Promise<AgentEvent[]> {
   const found: AgentEvent[] = [];
   for await (const event of events) found.push(event);
   return found;
+}
+
+async function collect(events: AsyncGenerator<AgentEvent>): Promise<AgentEvent[]> {
+  const found: AgentEvent[] = [];
+  for await (const event of events) found.push(event);
+  // Dropped from what the assertions read: every generation that gets as far as
+  // the model opens with it, and one test below is about that on its own.
+  return found.filter((event) => event.type !== 'generation_started');
 }
 
 function textOf(events: readonly AgentEvent[]): string {
@@ -580,5 +594,28 @@ describe('what the model is told', () => {
     await collect(runnerWith(gateway, tool).run(QUESTION, signal));
 
     expect(tool.asked).toEqual(['']);
+  });
+});
+
+describe('the first thing a generation says', () => {
+  it('is which model is about to be asked', async () => {
+    const gateway = fakeGateway(says('Nothing to see.'));
+
+    const [first] = await collectAll(runnerWith(gateway, fakeTool()).run(QUESTION, signal));
+
+    // Not read from configuration where it is streamed: the model named here is
+    // the one this generation was actually built for, and it is also what gets
+    // stored on the row.
+    expect(first).toEqual({ type: 'generation_started', model: CONTEXT.model });
+  });
+
+  it('is not said at all when there is nothing to ask it with', async () => {
+    const gateway = fakeGateway(says('unreachable'));
+
+    const events = await collectAll(runnerWith(gateway, fakeTool(), null).run(QUESTION, signal));
+
+    // A generation that never starts must not announce that it did — a client
+    // would clear the composer and wait for a stream that is already over.
+    expect(events.map((event) => event.type)).toEqual(['error']);
   });
 });
