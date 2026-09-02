@@ -6,6 +6,7 @@ import type { ChatCompletionChunk, ChatCompletionCreateParamsStreaming } from 'o
 import { toChunks, toMessages, toTools } from './openai-protocol';
 import { CircuitBreaker } from '../../shared/async/circuit-breaker';
 import { APP_CONFIG } from '../../shared/config/app-config.token';
+import { AppLogger, asError } from '../../shared/observability/app-logger';
 import type {
   Capabilities,
   ChatMessage,
@@ -68,20 +69,42 @@ export class OpenAiLlmGateway implements LlmGateway {
   private readonly breaker = new CircuitBreaker({
     failuresBeforeOpening: FAILURES_BEFORE_OPENING,
     openForMs: CIRCUIT_OPEN_MS,
-    // Somebody pressing stop is not the endpoint failing. Counted, five people
-    // changing their minds in a row would open the circuit on everyone else —
-    // and stopping is a thing this system invites them to do.
-    countsAsFailure: (error) => !(error instanceof OpenAI.APIUserAbortError),
+    countsAsFailure: saysSomethingAboutTheEndpoint,
   });
 
   constructor(
     @Inject(APP_CONFIG) config: AppConfig,
     @Inject(OPENAI_COMPLETIONS) private readonly completions: CompletionsApi,
+    private readonly logger: AppLogger,
   ) {
     this.model = config.llm.model;
   }
 
   async *streamCompletion(
+    request: CompletionRequest,
+    signal: AbortSignal,
+  ): AsyncIterable<CompletionChunk> {
+    // Said here and nowhere else. What went wrong is a fact about this provider —
+    // a refused key, a closed circuit, a socket that would not open — and this is
+    // the one file that knows there is a provider. Everything above is told only
+    // that the answer could not be written, because that is all a reader can use.
+    try {
+      yield* this.attempt(request, signal);
+    } catch (error) {
+      // The same question the breaker asks, asked by the same function: a log
+      // full of "the endpoint failed" every time somebody presses stop would
+      // describe an outage that never happened.
+      if (saysSomethingAboutTheEndpoint(error)) {
+        this.logger.warn('the model endpoint failed mid-generation', {
+          scope: 'OpenAiLlmGateway',
+          err: asError(error),
+        });
+      }
+      throw error;
+    }
+  }
+
+  private async *attempt(
     request: CompletionRequest,
     signal: AbortSignal,
   ): AsyncIterable<CompletionChunk> {
@@ -144,6 +167,21 @@ export class OpenAiLlmGateway implements LlmGateway {
 
     return { usable: missing.length === 0, missing };
   }
+}
+
+/**
+ * Whether an error says anything about the endpoint at all.
+ *
+ * Somebody pressing stop does not: counted as a failure, five people changing
+ * their minds in a row would open the circuit on everyone else, and a log of
+ * them would read as an outage. Stopping is a thing this system invites people
+ * to do, so it is not evidence of anything except that they did it.
+ *
+ * One definition, asked in both places, so the breaker and the log can never
+ * come to disagree about what a failure is.
+ */
+function saysSomethingAboutTheEndpoint(error: unknown): boolean {
+  return !(error instanceof OpenAI.APIUserAbortError);
 }
 
 /**

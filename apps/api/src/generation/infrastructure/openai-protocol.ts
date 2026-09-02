@@ -90,9 +90,7 @@ export async function* toChunks(stream: AsyncIterable<SdkChunk>): AsyncIterable<
     const choice = raw.choices[0];
     if (choice === undefined) continue;
 
-    if (choice.delta.content !== null && choice.delta.content !== undefined) {
-      yield { kind: 'text', text: choice.delta.content };
-    }
+    yield* progressOf(choice.delta);
     calls.take(choice.delta.tool_calls);
 
     if (choice.finish_reason !== null) {
@@ -107,6 +105,22 @@ export async function* toChunks(stream: AsyncIterable<SdkChunk>): AsyncIterable<
   if (!finished) {
     yield* calls.flush();
     yield { kind: 'finish', reason: 'other' };
+  }
+}
+
+/** What one chunk of a turn shows a reader: words, or a query being written. */
+function* progressOf(delta: SdkChunk['choices'][number]['delta']): Generator<CompletionChunk> {
+  if (delta.content !== null && delta.content !== undefined) {
+    yield { kind: 'text', text: delta.content };
+  }
+
+  for (const fragment of delta.tool_calls ?? []) {
+    const written = fragment.function?.arguments ?? '';
+    // The first fragment of a call is usually its name and id and nothing else,
+    // and "the model wrote nothing" is not progress worth reporting.
+    if (written !== '') {
+      yield { kind: 'tool_call_delta', index: fragment.index, argumentsDelta: written };
+    }
   }
 }
 

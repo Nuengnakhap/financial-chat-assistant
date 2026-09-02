@@ -1,8 +1,11 @@
+import { Writable } from 'node:stream';
+
 import type { AppConfig } from '@fca/config';
 import OpenAI from 'openai';
 import type { ChatCompletionChunk, ChatCompletionCreateParamsStreaming } from 'openai/resources';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { AppLogger, createPinoLogger } from '../../../shared/observability/app-logger';
 import type { CompletionChunk, CompletionRequest } from '../../application/ports/llm-gateway.port';
 import { QUERY_TOOL } from '../../application/prompt.factory';
 import { OpenAiLlmGateway, type CompletionsApi } from '../openai-llm.gateway';
@@ -146,12 +149,30 @@ async function collect(chunks: AsyncIterable<CompletionChunk>): Promise<Completi
   return found;
 }
 
+/** Captured rather than silenced: what the provider said is the point of it. */
+function capturing(): { readonly logger: AppLogger; text: () => string } {
+  const written: string[] = [];
+  const destination = new Writable({
+    write(chunk: Buffer, _encoding, done) {
+      written.push(chunk.toString());
+      done();
+    },
+  });
+
+  return {
+    logger: new AppLogger(createPinoLogger({ level: 'debug', pretty: false, destination })),
+    text: () => written.join(''),
+  };
+}
+
 let fake: FakeCompletions;
+let logs: ReturnType<typeof capturing>;
 let gateway: OpenAiLlmGateway;
 
 beforeEach(() => {
   fake = fakeCompletions([delta('Apple'), delta("'s revenue"), stop('stop')]);
-  gateway = new OpenAiLlmGateway(CONFIG, fake.api);
+  logs = capturing();
+  gateway = new OpenAiLlmGateway(CONFIG, fake.api, logs.logger);
 });
 
 describe('the request', () => {
@@ -201,10 +222,9 @@ describe('what comes back', () => {
       stop('tool_calls'),
     ];
 
-    const [first] = await collect(gateway.streamCompletion(REQUEST, new AbortController().signal));
+    const chunks = await collect(gateway.streamCompletion(REQUEST, new AbortController().signal));
 
-    expect(first).toMatchObject({
-      kind: 'tool_calls',
+    expect(chunks.find((chunk) => chunk.kind === 'tool_calls')).toMatchObject({
       calls: [{ id: 'call_1', name: 'query_financial_data' }],
     });
   });
@@ -216,7 +236,12 @@ describe('what comes back', () => {
       stop('tool_calls'),
     ];
 
+    // The fragments go out as they arrive — a person watching a query being
+    // written is watching the assistant work — and the call goes out once more,
+    // whole, when the model stops.
     expect(await collect(gateway.streamCompletion(REQUEST, new AbortController().signal))).toEqual([
+      { kind: 'tool_call_delta', index: 0, argumentsDelta: '{"sql":"SELECT ' },
+      { kind: 'tool_call_delta', index: 0, argumentsDelta: 'revenue FROM financial_data"}' },
       {
         kind: 'tool_calls',
         calls: [
@@ -228,6 +253,23 @@ describe('what comes back', () => {
         ],
       },
       { kind: 'finish', reason: 'tool_calls' },
+    ]);
+  });
+
+  it('says nothing about a fragment that carried no arguments', async () => {
+    // The first fragment of a call is often just its name and id.
+    fake.chunks = [
+      toolCall({ index: 0, id: 'call_1', name: 'query_financial_data', args: '' }),
+      toolCall({ index: 0, args: '{"sql":"SELECT 1"}' }),
+      stop('tool_calls'),
+    ];
+
+    const deltas = (
+      await collect(gateway.streamCompletion(REQUEST, new AbortController().signal))
+    ).filter((chunk) => chunk.kind === 'tool_call_delta');
+
+    expect(deltas).toEqual([
+      { kind: 'tool_call_delta', index: 0, argumentsDelta: '{"sql":"SELECT 1"}' },
     ]);
   });
 });
@@ -288,12 +330,42 @@ describe('a stream that stops without saying why', () => {
 
     expect(await collect(gateway.streamCompletion(REQUEST, new AbortController().signal))).toEqual([
       { kind: 'text', text: 'thinking' },
+      { kind: 'tool_call_delta', index: 0, argumentsDelta: '{"sql":"SELECT 1"}' },
       {
         kind: 'tool_calls',
         calls: [{ id: 'call_1', name: 'query_financial_data', arguments: '{"sql":"SELECT 1"}' }],
       },
       { kind: 'finish', reason: 'other' },
     ]);
+  });
+});
+
+describe('when the endpoint fails', () => {
+  it('says what it said, in the log, where an operator is', async () => {
+    // The one file that knows there is a provider is the one that says what the
+    // provider did. Nothing above this line is told more than "it failed".
+    fake.failWith = new Error('connect ECONNREFUSED 10.0.0.1:443');
+
+    await expect(
+      collect(gateway.streamCompletion(REQUEST, new AbortController().signal)),
+    ).rejects.toThrow('ECONNREFUSED');
+
+    expect(logs.text()).toContain('the model endpoint failed mid-generation');
+    expect(logs.text()).toContain('ECONNREFUSED');
+  });
+});
+
+describe('when somebody presses stop', () => {
+  it('is not written down as the endpoint failing', async () => {
+    // The breaker already refuses to count this; the log has to agree, or an
+    // operator reading it sees an outage every time a person changes their mind.
+    fake.failWith = new OpenAI.APIUserAbortError();
+
+    await expect(
+      collect(gateway.streamCompletion(REQUEST, new AbortController().signal)),
+    ).rejects.toBeInstanceOf(OpenAI.APIUserAbortError);
+
+    expect(logs.text()).toBe('');
   });
 });
 

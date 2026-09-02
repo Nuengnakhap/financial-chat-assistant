@@ -53,12 +53,20 @@ export const FINISH_REASONS = ['stop', 'tool_calls', 'length', 'other'] as const
 export type FinishReason = (typeof FINISH_REASONS)[number];
 
 /**
- * Tool calls arrive as one chunk holding all of them, not as fragments: the
- * arguments are only whole once the model has stopped, and nothing can act on
- * half of a query.
+ * A tool call arrives twice over: as fragments while the model writes it, and
+ * once more whole when it stops. Only the second is worth acting on — nothing
+ * can run a quarter of a query — but the first is worth showing, because a
+ * person watching a query being written is watching the assistant work rather
+ * than watching a spinner.
  */
 export type CompletionChunk =
   | { readonly kind: 'text'; readonly text: string }
+  | {
+      readonly kind: 'tool_call_delta';
+      /** Which call, when a model asks for two at once. */
+      readonly index: number;
+      readonly argumentsDelta: string;
+    }
   | { readonly kind: 'tool_calls'; readonly calls: readonly ToolCall[] }
   | { readonly kind: 'usage'; readonly usage: CompletionUsage }
   | { readonly kind: 'finish'; readonly reason: FinishReason };
