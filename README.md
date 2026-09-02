@@ -26,7 +26,8 @@ This repository is under active development. What works today:
 | SQL policy and query tool (AST, read-only role, cache)  | Working and verified |
 | The model (catalog, prompt, gateway, agent loop)        | Working and verified |
 | Durable stream (send, attach, resume, stop, recovery)   | Working and verified |
-| Chat screen and the budget                              | Not built yet        |
+| Chat screen (streaming, tables, charts, provenance)     | Working and verified |
+| Usage limits and the usage meter                        | Not built yet        |
 
 The commands below are the ones that run today. This section will grow as
 features land.

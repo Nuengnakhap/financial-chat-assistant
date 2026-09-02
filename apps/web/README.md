@@ -17,7 +17,7 @@ src/
 ├── components/              presentational primitives; no domain reaches them
 ├── domains/                 one folder per capability
 │   ├── auth/                api/ components/ hooks/ utils/, and an index.ts
-│   └── conversation/        the rail, the thread, and what deletes one
+│   └── conversation/        the rail, the room, the stream, and what deletes one
 ├── lib/                     api client, http, theme — knows no domain
 ├── config/                  values with no logic in them
 └── utils/                   pure helpers
@@ -198,15 +198,81 @@ once left sitting there after the conversation had gone.
 
 A conversation opens at its end. The pages arrive newest-first and each page
 reads oldest-first inside itself, so the chunks are reversed and their contents
-are not; the newest message is then scrolled to, once per conversation and never
-when an older page arrives, because loading what came before must not throw the
-reader back to the bottom of it.
+are not; the newest message is then scrolled to, and stays followed while an
+answer is written — for as long as the reader is there too. Distance from the
+bottom cannot tell the two apart, because content arriving widens that distance
+without anybody touching the scroll; what separates a reader who has moved from
+a page that has grown is the _direction_, so only a scroll that goes up from
+where the room last left it stops the following.
+
+## Watching an answer being written
+
+Asking answers `202` with a message id, and everything after that is a stream
+the page attaches to. Attaching for the first time, opening a second tab and
+coming back after a dropped connection are one code path: the client says where
+it got to with `Last-Event-ID` and is given everything after it.
+
+It is read with `fetch` and a `ReadableStream` rather than `EventSource`, for two
+reasons that both decide it. `EventSource` cannot set a header, and
+`Last-Event-ID` on the _first_ connection is the whole of resuming after a
+refresh — the browser sends that header only on reconnections it made itself,
+and a page that has just loaded has none. And it reconnects on its own schedule,
+which would race the backoff the page needs to own.
+
+The stream is read into one `useReducer` and nothing else. There is no store: the
+state lives exactly as long as the page and nobody else reads it. Every
+transition is total — an event this build does not expect, or one that arrives in
+a phase where it makes no sense, is ignored rather than thrown, because a stream
+is the one place where an older tab meets a newer server.
+
+The query cache is not touched until the end. Invalidating mid-stream would
+re-render the whole history for every delta, and the answer is not in the history
+until it is finished; the question is not read back either, because the page
+already has it and reading it would show the same question twice.
+
+**One renderer draws an answer being written and an answer written last week.**
+The stream builds the same `parts` a stored message has, so the two cannot
+quietly stop agreeing. A `draft_reset` — the gate finding a figure with nothing
+behind it — clears the text and keeps the query cards, because the data did not
+change, only what was said about it.
+
+**The green badge is the one claim this interface makes on its own behalf**, and
+it is made in exactly one situation: every figure in the answer was matched
+against a value in a query result. A fallback answer says "showing verified data
+only", a stopped one says it was stopped, and an answer with no figures in it —
+which is what a refusal is — says there was nothing to verify. None of them is
+green.
+
+A chart is drawn from a fenced block the model writes, parsed by a schema the
+prompt is generated from, so the instruction and the reader cannot drift. It is
+never the only place a figure appears: the model is told to write the table as
+well, and the table is what the verifier checked — which is what makes a chart
+that fails to render cost nothing but the picture. A block that does not parse
+stays a code block, because half the JSON is what most of the stream looks like.
 
 **Effects clean up.** Every subscription, timer and request is created with an
 `AbortController` and aborted on unmount. This is not hypothetical tidiness:
 React's StrictMode mounts each component twice in development, so the first
 request really is cancelled on every page load, and a missing cleanup shows up
 as a state update on an unmounted tree rather than as an obvious bug.
+
+Which is why **the page attaches again whenever the connection it had is gone**,
+rather than once per message. The teardown between those two passes aborts
+whatever the first one opened, and a page that only remembered having attached
+would be left holding a connection that no longer exists — reading nothing, with
+"Working on it…" on screen for as long as the tab is open. What is remembered is
+which answer is being read; whether a connection is open is asked.
+
+A dropped connection is not the same as a refusal. Anything the server answers
+in the four hundreds — the message is gone, it was never this person's, the
+session could not be saved — ends the attempt and says so, because asking eight
+more times cannot make it answer differently. Five hundreds, and no response at
+all, are what the backoff is for.
+
+The caret at the end of an answer means **this page is receiving those words**,
+not that a row says `generating`. A stored message can be unfinished with nobody
+reading it, and a caret blinking beside a message saying the connection is gone
+would claim two opposite things at once.
 
 ## Running it
 
@@ -227,6 +293,26 @@ and Playwright arrives with the first flow that spans several pages.
 JSX needs no plugin in the test path: the default transform reads `jsx:
 react-jsx` from the tsconfig nearest the file, the same way `apps/api` gets its
 decorators. `@vitejs/plugin-react` is for the dev server and the bundle.
+
+**Every screen is rendered inside `StrictMode`, and inside it at the root**, the
+way `main.tsx` does. React only double-invokes effects for a `StrictMode` that is
+the root of the render: one nested under a provider is measurably inert, so a
+test that wraps the component alone is testing nothing. Effects mounting, being
+torn down and mounting again is the shape that opens two connections to one
+stream, or leaves a page holding none, so it belongs in every test rather than in
+the two that remembered to ask for it. It also means "the first request" is not
+something a test can name — a test that needs one call to fail says so with a
+state it controls, not by counting.
+
+The stubbed `fetch` honours the `AbortSignal`, because the real one does. One
+that answered a request whose caller had gone would let a torn-down page go on
+dispatching what it read, and no test could see it.
+
+The example questions on the empty screen are checked against
+`data/financial_data.sql`: each names a company and years the seed holds. It is
+the only copy in the browser that says anything about the data, so it is the only
+copy that can drift away from it — and an invitation answered with "this dataset
+does not include it" is the worst first answer this application can give.
 
 Coverage includes this package at the same 95% threshold as everything else.
 `main.tsx` is the single exclusion: it mounts into a real document, which a unit
