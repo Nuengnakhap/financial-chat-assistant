@@ -160,6 +160,64 @@ async function parse(response: Response, expect: number | undefined): Promise<un
   });
 }
 
+/**
+ * Opens an event stream, with the same session handling every other request
+ * gets: the cookies, the CSRF echo, and one refresh-and-retry on a 401 — a
+ * generation outlives an access token, so a stream that reconnects after fifteen
+ * minutes would otherwise be refused for ever.
+ *
+ * Answers with the body rather than the response, because a stream that arrived
+ * without one is a failure, and finding that out inside the reading loop would
+ * put it three frames from the request that caused it.
+ */
+export async function openStream(
+  path: string,
+  lastEventId: string | null,
+  signal: AbortSignal,
+): Promise<ReadableStream<Uint8Array>> {
+  const response = await sendStream(path, lastEventId, signal);
+  if (response.status !== 401) return await bodyOf(response);
+
+  const refreshed = await refreshSession();
+  if (!refreshed) {
+    announceSessionExpired();
+    return await bodyOf(response);
+  }
+
+  return await bodyOf(await sendStream(path, lastEventId, signal));
+}
+
+async function sendStream(
+  path: string,
+  lastEventId: string | null,
+  signal: AbortSignal,
+): Promise<Response> {
+  try {
+    return await fetch(path, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        ...headersFor(undefined),
+        accept: 'text/event-stream',
+        ...(lastEventId === null ? {} : { 'last-event-id': lastEventId }),
+      },
+      signal,
+    });
+  } catch (error) {
+    if (isAbort(error)) throw error;
+    throw new NetworkError();
+  }
+}
+
+async function bodyOf(response: Response): Promise<ReadableStream<Uint8Array>> {
+  // `parse` throws the failure the envelope describes, which is what a 404 for
+  // somebody else's message has to become.
+  if (!response.ok) await parse(response, undefined);
+  if (response.body === null) throw new NetworkError();
+
+  return response.body;
+}
+
 function retryAfter(response: Response): { retryAfterSeconds?: number } {
   const header = response.headers.get('retry-after');
   if (header === null) return {};

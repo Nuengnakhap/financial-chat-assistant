@@ -1,4 +1,4 @@
-import { authContract, conversationsContract } from '@fca/contracts';
+import { authContract, conversationsContract, messagesContract } from '@fca/contracts';
 import type { z } from 'zod';
 
 import { apiFetch } from './http';
@@ -151,4 +151,13 @@ function createClient<T extends Record<string, Record<string, Endpoint>>>(contra
   return Object.fromEntries(groups) as Client<T>;
 }
 
-export const api = createClient({ auth: authContract, conversations: conversationsContract });
+/**
+ * `messagesContract.stream` is left out on purpose: it answers with an event
+ * stream rather than a body, so it has no response schema to parse and nothing
+ * this factory could do with it. Attaching to one lives in `sse.ts`.
+ */
+export const api = createClient({
+  auth: authContract,
+  conversations: conversationsContract,
+  messages: { startGeneration: messagesContract.startGeneration, stop: messagesContract.stop },
+});
