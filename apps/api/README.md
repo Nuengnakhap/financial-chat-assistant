@@ -33,8 +33,7 @@ src/
 ```
 
 `budget/` lands as it is built, split into `domain`, `application`,
-`infrastructure` and `presentation`; `generation/` has the first two of those so
-far — the durable stream and the HTTP surface are the phases after this one.
+`infrastructure` and `presentation`.
 
 A layer may only depend inwards and a context may not import another's internals
 — both enforced by `.dependency-cruiser.cjs`, with fixtures in
@@ -209,6 +208,58 @@ Evidence belongs to one generation. History is replayed as text and never as old
 tool results, so a figure from an earlier answer has nothing supporting it here
 and the model has to ask again — which, measured against the real model, is
 exactly what it does.
+
+**A generation is not attached to the connection that asked for it.** Sending a
+question answers `202` with a message id and a path, and writes three things in
+one transaction: the question, the empty row its answer goes in, and the outbox
+event that sets a runner going. Everything the runner produces is appended to a
+Redis Stream and never written to a socket, so closing the tab, losing a signal
+or picking the conversation up on another device changes who is reading and not
+whether the answer is still being written. A client attaches to
+`GET /messages/:id/stream` and says where it got to with `Last-Event-ID` — the
+header a browser sends by itself — and attaching for the first time, opening a
+second tab and coming back after a dropped connection are one code path.
+
+The obvious way to tail a stream per connection is `XREAD BLOCK`, and a blocking
+read holds a socket for as long as it blocks: ten thousand people watching would
+be ten thousand Redis connections from one process. `StreamMultiplexer` makes the
+count a property of the pod instead — a handful of readers, each blocking on up
+to sixty-four streams in one command, fanning out in process. Catching up is
+separate: a subscriber replays with `XRANGE`, which blocks nothing. The two paths
+overlap on purpose and the id is what decides, so a subscriber attaches to the
+live tail _before_ it replays a single entry. The other order leaves a window
+where an event reaches neither, and one delta missing from the middle of an
+answer reads as a finished sentence with a word cut out of it.
+
+Writing to the socket checks what it is doing. Ignoring the return of `write` is
+how one phone on a weak signal becomes unbounded memory in this process, so
+frames wait for the socket to drain and a reader too far behind is cut — which
+costs that reader nothing, because it resumes by id.
+
+**Disconnecting is not stopping.** The only thing that ends a generation early is
+`POST /messages/:id/stop`, and the request that asks is almost never handled by
+the process doing the writing: the stop is published on Redis and reaches
+whichever pod is holding it. That pod decides what had been written and stores
+it, so a stop that arrives a moment too late changes nothing — which is what "too
+late" means. A shutdown arrives at the same generation from the other direction,
+and both come through as one signal, because from inside there is nothing to tell
+them apart.
+
+**No message stays `generating`.** Everything above cleans up after itself; what
+none of it can do is clean up after a process that stopped existing. Because at
+most one generation runs per conversation, a row left behind by a killed pod does
+not merely leave a mess — it makes that conversation unusable for good. The
+janitor does not ask a process whether it is alive, since a dead one cannot
+answer: it reads the stream. A generation that is running is producing events,
+and one that has produced nothing for two minutes has stopped, whether it died,
+wedged, or lost the endpoint. What reached the stream is stored as a `stopped`
+message, so what the person watched happen is what the history shows.
+
+Every write that ends a generation is conditional on the row still being
+`generating`. A runner persisting a verified draft, a stop arriving a moment
+later and a janitor deciding the same row was abandoned are three writers, and
+the condition means the first of them decides and the others learn that they
+lost — including that they must not put a second terminal event on the stream.
 
 **A list is read by keyset, never by offset.** `OFFSET n` reads n rows in order
 to throw them away, and the rows move underneath whoever is reading: a

@@ -24,7 +24,9 @@ This repository is under active development. What works today:
 | Conversations (rail, history, delete pipeline)          | Working and verified |
 | Grounding (evidence, claim gate, verification, eval)    | Working and verified |
 | SQL policy and query tool (AST, read-only role, cache)  | Working and verified |
-| Chat (the model, streaming, the screen, the budget)     | Not built yet        |
+| The model (catalog, prompt, gateway, agent loop)        | Working and verified |
+| Durable stream (send, attach, resume, stop, recovery)   | Working and verified |
+| Chat screen and the budget                              | Not built yet        |
 
 The commands below are the ones that run today. This section will grow as
 features land.
