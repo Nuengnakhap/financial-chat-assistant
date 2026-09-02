@@ -6,6 +6,7 @@ import { TaskRegistry } from './bootstrap/task-registry';
 import { ConversationModule } from './conversation/conversation.module';
 import { ConversationDeletionSubscriber } from './conversation/infrastructure/conversation-deletion.subscriber';
 import { GenerationModule } from './generation/generation.module';
+import { GenerationSubscriber } from './generation/infrastructure/generation.subscriber';
 import { IdentityModule } from './identity/identity.module';
 import { APP_CONFIG } from './shared/config/app-config.token';
 import { CpuModule } from './shared/cpu/cpu.module';
@@ -81,10 +82,11 @@ import { RedisService } from './shared/redis/redis.service';
     // silently replace this one rather than add to it.
     {
       provide: DOMAIN_EVENT_HANDLERS,
-      useFactory: (deletion: ConversationDeletionSubscriber): readonly DomainEventHandler[] => [
-        deletion,
-      ],
-      inject: [ConversationDeletionSubscriber],
+      useFactory: (
+        deletion: ConversationDeletionSubscriber,
+        generation: GenerationSubscriber,
+      ): readonly DomainEventHandler[] => [deletion, generation],
+      inject: [ConversationDeletionSubscriber, GenerationSubscriber],
     },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
   ],
