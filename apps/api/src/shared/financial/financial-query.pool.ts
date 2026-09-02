@@ -36,6 +36,45 @@ export interface QueryRows {
 }
 
 /**
+ * The statements this repository wrote, as opposed to the ones a model wrote.
+ *
+ * They are here rather than where their results are interpreted so that the
+ * caller names a query instead of passing one: `readCatalog('companies')` takes
+ * a key, and no string of SQL — from a model or from anywhere else — has a type
+ * that fits. The other entry point takes a `CanonicalSql` for the same reason,
+ * and between them there is no way into this connection with a bare string.
+ *
+ * Neither is limited to fifty rows, which is a deliberate exception to the rule
+ * that every query has a ceiling. The ceiling is a rule about what the model may
+ * ask for; the catalog is the whole table by definition, and a truncated one
+ * would be worse than a slow one — a company cut off the end becomes a company
+ * this dataset does not have, in the prompt and in what the verifier will accept.
+ * What bounds it is the dataset: one table, seeded by an operator, 192 rows.
+ */
+const CATALOG_READS = {
+  /**
+   * One row per company and year, grouped in TypeScript rather than by
+   * `array_agg`: this connection reads every value as text, and an array would
+   * arrive as `{2022,2023}` to be parsed back out of PostgreSQL's own syntax.
+   */
+  companies: `SELECT company, ticker, sector, year
+     FROM financial_data
+     ORDER BY company, year`,
+  /**
+   * `count(column)` counts the rows where the column is not null, so one row
+   * answers "how much of this column is actually recorded" for all of them.
+   */
+  recorded: `SELECT count(*) AS rows,
+            count(revenue) AS revenue,
+            count(net_income) AS net_income,
+            count(operating_income) AS operating_income,
+            count(gross_profit) AS gross_profit
+     FROM financial_data`,
+} as const;
+
+export type CatalogRead = keyof typeof CATALOG_READS;
+
+/**
  * Every value arrives as text, including the numbers — especially the numbers.
  * A `bigint` past 2^53 and a `numeric` average with eight decimal places both
  * lose digits on the way into a JavaScript number, and those digits are what an
@@ -70,6 +109,19 @@ export class FinancialQueryPool implements OnModuleDestroy, HealthIndicator {
    */
   async query(sql: CanonicalSql): Promise<QueryRows> {
     const result = await this.pool.query<unknown[]>({ text: sql.text, rowMode: 'array' });
+
+    return {
+      columns: result.fields.map((field) => field.name),
+      rows: result.rows.map((row) => row.map(cellText)),
+    };
+  }
+
+  /** A statement from this file, named. See `CATALOG_READS`. */
+  async readCatalog(read: CatalogRead): Promise<QueryRows> {
+    const result = await this.pool.query<unknown[]>({
+      text: CATALOG_READS[read],
+      rowMode: 'array',
+    });
 
     return {
       columns: result.fields.map((field) => field.name),
