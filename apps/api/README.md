@@ -17,7 +17,7 @@ src/
 │   └── shutdown.ts          the order things stop in
 ├── conversation/            bounded context: conversations and their messages
 ├── identity/                bounded context: password hashing, tokens, sessions
-├── generation/              bounded context: the SQL policy and the query tool
+├── generation/              bounded context: the SQL policy, the query tool, the catalog, the model
 └── shared/
     ├── async/               the one place a timeout is written
     ├── cache/               LayeredCache: memory, Redis, and one call to the source
@@ -34,10 +34,12 @@ src/
 
 `budget/` lands as it is built, split into `domain`, `application`,
 `infrastructure` and `presentation`; `generation/` has the first two of those so
-far — the model, the runner and the stream are the phases after this one. A layer may only depend inwards and a context may not import
-another's internals — both enforced by `.dependency-cruiser.cjs`, with fixtures
-in `tools/architecture/` that prove the rules fire. Anything two contexts need
-to say the same way, such as `OwnerScope`, lives in `@fca/domain` rather than in
+far — the runner and the stream are the phases after this one.
+
+A layer may only depend inwards and a context may not import another's internals
+— both enforced by `.dependency-cruiser.cjs`, with fixtures in
+`tools/architecture/` that prove the rules fire. Anything two contexts need to say
+the same way, such as `OwnerScope`, lives in `@fca/domain` rather than in
 whichever one happened to need it first.
 
 ## The rules this package exists to hold
@@ -140,6 +142,43 @@ rather than as "these columns" is what once let this year's question be answered
 with last year's figure. The tool declines to build a display string for a name
 the driver returned twice as well, since that guard does not depend on any of the
 reasoning above being right.
+
+**Nothing in this repository says what the dataset covers.** The companies, the
+years and the gaps are read from the table at boot and again every ten minutes,
+and everything downstream is a projection of that one answer: the prompt the
+model is given, the years a figure may be attributed to, and the sentence said
+when the data is not there. Reseed with a different dump and all three move
+together, because none of them has its own copy.
+
+The catalog carries a fingerprint, which is what makes the prompt cacheable: the
+system message is a pure function of the catalog, so an unchanged fingerprint
+means a byte-identical prefix. Measured against the configured endpoint, 1,536 of
+1,825 prompt tokens came back served from the provider's cache on the second
+call.
+
+**The rules in the prompt are there because something was measured.** Each one
+cost a wasted draft or a wasted round before it was written: copy the display
+strings rather than formatting figures (without it the model wrote SQL to format
+them and failed to finish two questions in twelve); query before saying the data
+is absent (a refusal with no query behind it is refused by verification exactly
+like an unsupported figure); return a percentage as a percentage (`0.5874` in the
+result cannot support `58.7%` in the sentence); multiply before dividing two
+amounts (they are integers, so the fraction is otherwise lost, which the model
+discovers by reading a column of zeroes and asking again); and order with `NULLS
+LAST` (or "the five largest" begins with the three that have no figure at all).
+
+**The provider is behind an anti-corruption layer.** No type from the SDK appears
+outside `generation/infrastructure`: what leaves the gateway is text, finished
+tool calls, what the call cost and why it stopped. Retries are the SDK's, which
+knows its own status codes and reads `retry-after`; a second retry wrapped around
+that would multiply rather than add. What the SDK has no opinion about is the
+fifth consecutive failure, so the circuit breaker is ours.
+
+A smoke call at boot asks whether the endpoint streams and whether it will call a
+tool — plenty of OpenAI-compatible endpoints hold a conversation perfectly and
+ignore `tools`, and nothing else notices until the first question comes back
+ungrounded. What it finds is logged and held, not made a readiness condition, for
+the reason readiness gives above.
 
 **A list is read by keyset, never by offset.** `OFFSET n` reads n rows in order
 to throw them away, and the rows move underneath whoever is reading: a
