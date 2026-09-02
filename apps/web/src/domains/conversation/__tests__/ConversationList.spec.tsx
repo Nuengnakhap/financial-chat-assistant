@@ -67,16 +67,20 @@ describe('the rail', () => {
   });
 
   it('offers to read again when the list could not be read at all', async () => {
-    let attempts = 0;
-    stubApi(() => {
-      attempts += 1;
-      return attempts === 1
-        ? refused({ code: 'internal', message: 'Something went wrong on our side.', status: 500 })
-        : page([ROOM]);
-    });
+    // Which read fails is a state the test controls rather than a count: a
+    // screen mounts, is torn down and mounts again on its way in, so "the first
+    // request" is not a thing the test can name.
+    let readable = false;
+    stubApi(() =>
+      readable
+        ? page([ROOM])
+        : refused({ code: 'internal', message: 'Something went wrong on our side.', status: 500 }),
+    );
 
     renderApp(<ConversationList />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    const again = await screen.findByRole('button', { name: 'Try again' });
+    readable = true;
+    await userEvent.click(again);
 
     expect(await screen.findByRole('link', { name: 'Apple revenue' })).toBeInTheDocument();
   });
