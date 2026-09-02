@@ -51,15 +51,31 @@ export class PgFinancialQueryTool implements FinancialQueryTool {
 
     const plan = this.policy.validate(sql);
     if (!plan.ok) {
-      return failed(toolCallId, { kind: plan.error.rule, message: plan.error.message }, started);
+      return failed(toolCallId, {
+        failure: { kind: plan.error.rule, message: plan.error.message },
+        started,
+      });
     }
 
+    // What ran, rather than what was typed: the canonical form is the one a
+    // person is shown and the one a failure should name.
+    const canonical = plan.value.sql.text;
     try {
       const reading = await this.query.rows(plan.value.sql);
-      const call: Call = { toolCallId, reading, started, usdColumns: plan.value.usdColumns };
+      const call: Call = {
+        toolCallId,
+        sql: canonical,
+        reading,
+        started,
+        usdColumns: plan.value.usdColumns,
+      };
       return await this.withinBudget(call);
     } catch (error) {
-      return failed(toolCallId, { kind: 'database', message: databaseMessage(error) }, started);
+      return failed(toolCallId, {
+        failure: { kind: 'database', message: databaseMessage(error) },
+        started,
+        sql: canonical,
+      });
     }
   }
 
@@ -94,6 +110,8 @@ export class PgFinancialQueryTool implements FinancialQueryTool {
 
 interface Call {
   readonly toolCallId: string;
+  /** The canonical form, which is what ran and what anyone is shown. */
+  readonly sql: string;
   readonly reading: QueryReading;
   readonly started: number;
   readonly usdColumns: ReadonlySet<string>;
@@ -104,6 +122,7 @@ function outcomeOf(call: Call, shown: number, truncated: Truncation | null): Que
 
   return {
     toolCallId: call.toolCallId,
+    sql: call.sql,
     columns: call.reading.columns,
     rows,
     display: displayColumns(call.reading.columns, rows, call.usdColumns),
@@ -177,9 +196,20 @@ function usdText(value: string | null): string | null {
   return formatUsd(roundToInteger(ratio(numerator, 10n ** BigInt(fraction.length))));
 }
 
-function failed(toolCallId: string, failure: ToolFailure, started: number): QueryOutcome {
+/** A call that produced no rows, and what to say about it. */
+interface Failure {
+  readonly failure: ToolFailure;
+  readonly started: number;
+  /** The canonical form, when the query got far enough to have one. */
+  readonly sql?: string;
+}
+
+function failed(toolCallId: string, refusal: Failure): QueryOutcome {
+  const { failure, started } = refusal;
+
   return {
     toolCallId,
+    sql: refusal.sql ?? null,
     columns: [],
     rows: [],
     display: new Map(),

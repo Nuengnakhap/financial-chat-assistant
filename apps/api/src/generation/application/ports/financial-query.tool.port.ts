@@ -31,6 +31,12 @@ export interface Truncation {
 
 export interface QueryOutcome {
   readonly toolCallId: string;
+  /**
+   * The statement that ran — the deparsed, canonical form rather than the text
+   * the model wrote, because that is what a person is shown and what a log line
+   * is about. `null` when the policy refused, since nothing was made canonical.
+   */
+  readonly sql: string | null;
   /** Empty when the query did not run. */
   readonly columns: readonly string[];
   /**
