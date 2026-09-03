@@ -29,6 +29,8 @@ export interface AppConfig {
     /** Questions per minute per person — a burst limit, not a spending one. */
     readonly sendsPerMinute: number;
   };
+  /** How long a published outbox row that was only ever a job is kept. */
+  readonly outboxJobRetentionDays: number;
   readonly auth: {
     readonly jwtSecret: string;
     readonly accessTokenTtlMs: number;
@@ -108,6 +110,7 @@ function toAppConfig(env: Env): AppConfig {
       requestTimeoutMs: env.LLM_REQUEST_TIMEOUT_MS,
     },
     usage: usageOf(env),
+    outboxJobRetentionDays: env.OUTBOX_JOB_RETENTION_DAYS,
     auth: {
       jwtSecret: env.JWT_SECRET,
       accessTokenTtlMs: env.ACCESS_TOKEN_TTL,

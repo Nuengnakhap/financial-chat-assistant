@@ -1,3 +1,4 @@
+import type { DomainEventType } from '@fca/domain';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { OutboxRelay, type OutboxPublisher, type PublishedEvent } from '../outbox-relay';
@@ -46,7 +47,7 @@ async function seed(count: number): Promise<void> {
     Array.from({ length: count }, (_unused, index) => ({
       aggregate: 'conversation',
       aggregateId: crypto.randomUUID(),
-      type: 'conversation.created',
+      type: 'generation.requested',
       payload: { index },
     })),
   );
@@ -182,5 +183,77 @@ describe('two relays running at once', () => {
     expect(secondCount).toBe(0);
     expect(recording.published).toEqual([]);
     expect(blocking.seen[0]).toHaveLength(4);
+  });
+});
+
+/**
+ * The outbox is two things at once — a queue of jobs and the only record of two
+ * facts nothing else keeps — and this is where that is decided rather than left
+ * to whoever writes the next `DELETE`.
+ */
+describe('forgetting the jobs that were only ever jobs', () => {
+  const anHourAgo = (): Date => new Date(Date.now() - 3_600_000);
+  const inAnHour = (): Date => new Date(Date.now() + 3_600_000);
+
+  async function seedOne(type: DomainEventType, publishedAt: Date | null): Promise<void> {
+    await h.db.insert(outboxEvents).values({
+      aggregate: 'conversation',
+      aggregateId: crypto.randomUUID(),
+      // The narrow `chk_outbox_type` is what makes this safe, and what would
+      // reject a name this vocabulary no longer has.
+      type,
+      payload: {},
+      publishedAt,
+    });
+  }
+
+  const remaining = async (): Promise<readonly string[]> =>
+    (await h.db.select().from(outboxEvents)).map((row) => row.type);
+
+  it('forgets a job that has been done', async () => {
+    await seedOne('generation.requested', anHourAgo());
+
+    expect(await relayFor(new RecordingPublisher()).forgetFinishedJobs(inAnHour())).toBe(1);
+    expect(await remaining()).toEqual([]);
+  });
+
+  it('keeps a job that has not been published yet, however old', async () => {
+    // Unpublished means the work has not happened. Deleting it would lose the
+    // only instruction to do it, which is the one thing an outbox exists to
+    // make impossible.
+    await seedOne('generation.requested', null);
+
+    expect(await relayFor(new RecordingPublisher()).forgetFinishedJobs(inAnHour())).toBe(0);
+    expect(await remaining()).toEqual(['generation.requested']);
+  });
+
+  it('keeps the two that are the only record of anything', async () => {
+    // A conversation is hard-deleted, so the request is the only trace it
+    // existed; a revoked family says it is gone but not why. Pruning these
+    // would be pruning the audit trail.
+    await seedOne('conversation.delete_requested', anHourAgo());
+    await seedOne('session.token_reuse_detected', anHourAgo());
+
+    expect(await relayFor(new RecordingPublisher()).forgetFinishedJobs(inAnHour())).toBe(0);
+    expect([...(await remaining())].sort()).toEqual([
+      'conversation.delete_requested',
+      'session.token_reuse_detected',
+    ]);
+  });
+
+  it('keeps a job that is younger than the cutoff', async () => {
+    await seedOne('generation.requested', new Date());
+
+    expect(await relayFor(new RecordingPublisher()).forgetFinishedJobs(anHourAgo())).toBe(0);
+  });
+
+  it('takes no more than it was asked for in one sweep', async () => {
+    // A delete holding a lock on ten million rows blocks the relay behind it,
+    // and the relay is on the path between a question and its answer.
+    await seed(5);
+    await h.db.update(outboxEvents).set({ publishedAt: anHourAgo() });
+
+    expect(await relayFor(new RecordingPublisher()).forgetFinishedJobs(inAnHour(), 2)).toBe(2);
+    expect(await remaining()).toHaveLength(3);
   });
 });

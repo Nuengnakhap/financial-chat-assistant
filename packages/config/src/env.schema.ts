@@ -106,6 +106,14 @@ export const envSchema = z.object({
    * how long the row survives for anyone reconstructing what happened.
    */
   SESSION_RETENTION_DAYS: wholeNumber(1, 3_650).default(30),
+  /**
+   * How long a published `generation.requested` row is kept. It is a job that
+   * has been done, and one is written for every question — the only row in the
+   * outbox that grows with use. The other two are kept for good: a deleted
+   * conversation and a reused refresh token have no other record anywhere, and
+   * pruning them would be pruning the audit trail.
+   */
+  OUTBOX_JOB_RETENTION_DAYS: wholeNumber(1, 3_650).default(7),
 
   AUTH_THROTTLE_WINDOW_SECONDS: wholeNumber(1, 3_600).default(300),
   /** An address is guessed far less often than a host is shared, hence two numbers. */

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 
 import { BullMqOutboxPublisher } from './bullmq-outbox-publisher';
 import { DomainEventWorker } from './domain-event-worker';
+import { ForgetFinishedJobs } from './forget-finished-jobs';
+import { OutboxJanitor } from './outbox-janitor';
 import { OutboxPump } from './outbox-pump';
 import { DatabaseService } from '../persistence/database.service';
 import { OutboxRelay, OUTBOX_PUBLISHER, type OutboxPublisher } from '../persistence/outbox-relay';
@@ -31,6 +33,8 @@ import { PersistenceModule } from '../persistence/persistence.module';
       inject: [DatabaseService, OUTBOX_PUBLISHER],
     },
     OutboxPump,
+    OutboxJanitor,
+    ForgetFinishedJobs,
     DomainEventWorker,
   ],
 })

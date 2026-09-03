@@ -1,5 +1,5 @@
 import type { DomainEvent, JsonValue } from '@fca/domain';
-import { asc, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
 
 import type { DatabaseService } from './database.service';
 import { outboxEvents } from './schema';
@@ -77,6 +77,45 @@ export class OutboxRelay {
     });
   }
 
+  /**
+   * Forgets jobs that have been done, and keeps everything else for good.
+   *
+   * The outbox is two things at once, and this is where that is said out loud.
+   * `generation.requested` is a job: one row per question, done the moment a
+   * runner picks it up, and the only thing in this table that grows with use.
+   * The other two are records — a conversation is hard-deleted, so the request
+   * to delete it is the only trace it existed, and a revoked session family says
+   * it is gone but not why. Pruning those would be pruning the audit trail.
+   *
+   * Bounded per sweep rather than one `DELETE` over the lot: a delete that takes
+   * a lock on ten million rows blocks the relay behind it, and the relay is on
+   * the path between asking a question and it starting to be answered.
+   */
+  async forgetFinishedJobs(before: Date, batchSize = BATCH_SIZE): Promise<number> {
+    const doomed = await this.database.db
+      .select({ id: outboxEvents.id })
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.type, FINISHED_JOB),
+          isNotNull(outboxEvents.publishedAt),
+          lt(outboxEvents.createdAt, before),
+        ),
+      )
+      .limit(batchSize);
+
+    if (doomed.length === 0) return 0;
+
+    await this.database.db.delete(outboxEvents).where(
+      inArray(
+        outboxEvents.id,
+        doomed.map((row) => row.id),
+      ),
+    );
+
+    return doomed.length;
+  }
+
   async drainAll(batchSize = BATCH_SIZE): Promise<number> {
     let total = 0;
     let drained = await this.drainBatch(batchSize);
@@ -90,6 +129,13 @@ export class OutboxRelay {
     return total;
   }
 }
+
+/**
+ * The one event in the vocabulary that is a job rather than a record. Named here
+ * rather than passed in, because "which of these is safe to forget" is a fact
+ * about the vocabulary and not a knob.
+ */
+const FINISHED_JOB = 'generation.requested';
 
 /** The `chk_outbox_type` constraint is what makes the type assertion here true. */
 function toPublished(row: typeof outboxEvents.$inferSelect): PublishedEvent {
