@@ -34,6 +34,11 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
 5. **State changes that trigger work elsewhere go through the transactional
    outbox** — never "write to DB, then enqueue".
 6. **Never log message content or model answers** at normal levels.
+7. **A question is stripped of invisible characters at the door and never
+   afterwards** — `asModelSafeText` in `StartGenerationUseCase`, so what is
+   stored, shown, titled and answered is one string. Nothing visible is
+   changed: an instruction aimed at the model is left exactly as typed, because
+   what makes it harmless is the claim gate and not a filter.
 
 ## Architecture in one screen
 
@@ -47,7 +52,11 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
   are framework-free: no NestJS, Drizzle, pg, ioredis, React imports there.
 - Every HTTP body and SSE event is defined once in `packages/contracts` and
   imported by both sides. Money crosses the wire as a micro-USD string, never a
-  JSON number. An unknown SSE event is skipped, never fatal.
+  JSON number. An unknown SSE event is skipped, never fatal. `/healthz/*` is the
+  one family outside that rule and always has been: it has no client in
+  `apps/web`, so there is no second side to share a definition with, and a probe
+  that answered a shape somebody could depend on would be an API rather than a
+  probe.
 - A response never carries a developer message, an exception name or a stack.
   `DomainErrorFilter` maps a code to a status and to wording written for a person.
 - `LogContext` is the closed set of fields a log line may carry. Adding message
@@ -125,14 +134,20 @@ pnpm dev              # api :3000 + web :5173
 pnpm typecheck        # tsc --noEmit per package, spec files included
 pnpm test             # vitest, unit only — no Docker needed
 pnpm test:integration # persistence against a real PostgreSQL (needs Docker)
-pnpm test:e2e         # Playwright, scenarios S1–S6
-pnpm eval             # deterministic grounding suite (CI gate)
+pnpm eval             # deterministic grounding suite, inside `pnpm test`
 pnpm lint             # eslint + dependency-cruiser + knip
 pnpm contracts:snapshot  # re-record the published contract surface after a safe change
+pnpm audit            # advisories at high or above; run before delivering
+
+# These three need the stack up (`pnpm infra:up && pnpm dev`) and are not in `pnpm check`
+pnpm test:e2e         # Playwright in a real browser: S1, S2, S3, S5, S6 + isolation
+pnpm eval:live        # the golden questions through the real model — spends money
+pnpm drill <redis|postgres>  # stop a dependency under a running API and watch it recover
 ```
 
-`pnpm test:e2e` is the one entry that does not exist yet. Everything else in
-this list runs today.
+Everything in this list runs today. The last three are separate from the gate
+on purpose: one drives a browser, one spends real money, and one stops a
+database — none of which belongs in a command somebody runs before every commit.
 
 ## Definition of done for a change
 

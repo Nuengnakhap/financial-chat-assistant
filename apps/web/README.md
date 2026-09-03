@@ -117,7 +117,7 @@ with its alpha baked in and no dark override. `--color-ink` inverts between
 themes, so a veil built from it would dim a light page and wash a dark one out;
 a scrim is one decision rather than a colour and an opacity kept in step.
 
-## Three rules this package exists to hold
+## The rules this package exists to hold
 
 **The API is proxied, never reached across origins.** Vite serves the page on
 `:5173` and forwards `/api` and `/healthz` to `:3000`, so the browser only ever
@@ -145,6 +145,23 @@ race: it mounts twice, so the very first page load issues two requests.
 A second 401 after a successful refresh is not an expired token, so there is no
 second attempt; the failure surfaces and a refusal to refresh at all ends the
 session through `onSessionExpired`.
+
+That announcement is ignored on `/login` and `/register`. A visitor who has
+never signed in gets a 401 from the first `/auth/me`, a 401 from the refresh
+behind it, and therefore a session-expired announcement — which, sent to a
+router that redirects on it, takes somebody who clicked "Register" back to the
+sign-in screen a beat after the form appears. Only a real browser shows it: in
+jsdom the two requests resolve before the screen is asserted on.
+
+**The page loads nothing it did not ship with.** `index.html` carries a
+`Content-Security-Policy` meta tag with `script-src 'self'` plus the SHA-256 of
+the one inline script — the theme restore, which has to run before first paint
+or everyone who chose dark sees a white flash. `'unsafe-inline'` would allow
+that script and equally any an injection managed to write into the page, and a
+hash goes stale the moment somebody edits the script, so `theme.spec.ts`
+recomputes it. `frame-ancestors` is deliberately absent: it is ignored in a meta
+tag and Chromium says so in the console on every load, which is how a console
+stops being read. Framing is refused by the header the API sends.
 
 ## Talking to the API
 

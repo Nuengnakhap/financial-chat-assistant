@@ -86,6 +86,15 @@ change, so where a delta happened to begin or end is invisible to it. A property
 test cuts an answer into two thousand different chunkings and gets the same bytes
 out every time, but the reason it passes is the design, not the test.
 
+Held means held even when the window has already been narrowed for another
+reason. While no query has run the gate releases only up to the last line break,
+and a figure that begins inside that reach and ends past it fits in neither — it
+was the case where `$999.9B` reached a screen, in a build whose property tests
+all passed, because every generated case had evidence and so never narrowed the
+window. The reach and the hold are now separate steps: whatever the window is,
+the release point moves back to the start of the first claim that does not fit
+inside it.
+
 Two shapes need more than a line before they can be read: a table, because a
 number in its leading cell is a rank only if it falls inside the row count the
 table ends up having, and a fenced block, because a fence means whatever its

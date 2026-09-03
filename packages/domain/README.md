@@ -17,6 +17,8 @@ without a container, a database or a browser.
 | `ownership.ts`                           | `OwnerScope` — the owner a repository call is confined to        |
 | `money/micro-usd.vo.ts`                  | Integer micro-USD money                                          |
 | `conversation/message-status.machine.ts` | The lifecycle of a message                                       |
+| `conversation/model-safe-text.ts`        | Takes the characters nobody can see out of a question            |
+| `events.ts`                              | The event vocabulary the outbox is allowed to carry              |
 | `generation/generation-phase.machine.ts` | The lifecycle of one attempt to answer                           |
 
 Import from the package root (`@fca/domain`). Deep imports are not part of the
@@ -45,6 +47,21 @@ tokens at values like $0.20, and `0.1 + 0.2 !== 0.3` in IEEE-754. A budget that
 drifts by a rounding error either lets a user overspend or refuses a request
 they have paid for, and neither shows up until someone reconciles a ledger.
 Division takes an explicit rounding direction because charging must round up.
+
+**A question keeps every character somebody can see.** `asModelSafeText`
+removes control characters, zero-width spaces, the bidirectional overrides and a
+byte-order mark — the ones that make a stored string and a rendered one disagree
+— and nothing else. Text that looks like an instruction to a model is left
+exactly as typed: mangling it would make the screen and the row disagree in a
+different way, a filter that tried would refuse "ignore the 2022 rows" too, and
+what stops an ungrounded figure is the claim gate rather than a word list.
+
+**An event type is spent on something that acts.** `DOMAIN_EVENT_TYPES` names
+three, not everything that happens: an outbox row is a promise that somewhere
+else will run, and a type nothing subscribes to is a row written, published and
+deleted for nobody. The set is closed, a `CHECK` constraint holds the same
+spelling in the database, and `tools/domain-events` fails the build if a member
+is added without a subscriber.
 
 **A lifecycle is a table, and its shape is tested.** Both state machines are
 plain transition tables, and their tests walk the graph rather than checking a

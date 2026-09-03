@@ -12,7 +12,7 @@ src/
 ├── create-app.ts            builds the app without listening, so tests use the real wiring
 ├── app.module.ts            composition root — every binding by token
 ├── bootstrap/
-│   ├── fastify.ts           adapter options, request-id hook
+│   ├── fastify.ts           adapter options, request-id hook, the headers every answer carries
 │   ├── task-registry.ts     every background task, so shutdown can wait for it
 │   └── shutdown.ts          the order things stop in
 ├── budget/                  bounded context: what a question may cost, and what it did
@@ -25,12 +25,12 @@ src/
     ├── config/              the APP_CONFIG token
     ├── cpu/                 worker pool for work that would stall the event loop
     ├── financial/           the pool SQL written by a model runs on, as llm_reader
-    ├── health/              live and ready probes
+    ├── health/              live and ready probes, and the counts this process has kept
     ├── http/                response envelope, error filter, request context, session guard
-    ├── observability/       AppLogger and the bridge NestJS logs through
+    ├── observability/       AppLogger, the bridge NestJS logs through, and Counters
     ├── persistence/         schema, DatabaseService, UnitOfWork, outbox relay
-    ├── queue/               the pump that drains the outbox, and the worker that runs it
-    └── redis/               RedisService, Lua scripts, the key registry
+    ├── queue/               the pump that drains the outbox, the worker that runs it, the janitor that forgets finished jobs
+    └── redis/               RedisService, Lua scripts, the sliding-window limiter, the key registry
 ```
 
 A layer may only depend inwards and a context may not import another's internals
@@ -62,6 +62,16 @@ than a rule to remember. `AppLogger` deliberately does not implement NestJS's
 `LoggerService`, whose `(message: any, ...params: any[])` signature would reopen
 the hole; `NestLoggerBridge` adapts the framework's calls instead.
 
+`Counters` is the same idea one step further: a name from a closed union, an
+optional label from a fixed set, and no value from a request anywhere near
+either. `GET /healthz/counters` reads them back. They are attached by decorating
+what already exists — `CountingGenerationEvents` around the stream every
+generation event passes through, `CountingSqlPolicy` around the policy — so no
+file that produces an event has to know a counter exists, and taking the two
+bindings out leaves the system behaving identically minus the numbers. Each is
+written first and counted second: a number that is larger than what really
+happened is the one a reader trusts.
+
 **Liveness never touches a dependency.** A database outage must not restart the
 process. Readiness does check — PostgreSQL and Redis, with a timeout, because a
 dependency that never answers is down rather than pending. The language model is
@@ -69,6 +79,14 @@ deliberately not one of them: reading history and signing in keep working while 
 provider is unavailable. The list lives at the composition root rather than in
 each module, because NestJS keeps one provider per token and two modules
 contributing their own list would leave one of them silently unused.
+
+Both `pg.Pool`s carry an `error` listener for a reason that is not stylistic:
+node-postgres emits on the pool when a connection dies while idle, and an
+unhandled `'error'` on an `EventEmitter` ends the process. Measured, not
+reasoned about — `pnpm drill postgres` stopped the database under a running API
+and killed it. With the listener, readiness goes red, the relay and the janitors
+log and carry on, and the same process is serving again when the database comes
+back.
 
 **A change and the news of it are one transaction.** Anything that alters state
 and has to reach somewhere else goes through `UnitOfWork`: repositories and an
@@ -88,6 +106,16 @@ composed at the composition root, next to the readiness list and for the same
 reason. Both halves run in the API process and still speak through Redis, so
 moving the worker into its own process changes where it is started and nothing
 about how either behaves.
+
+The outbox is two things at once, and `OutboxJanitor` is where that is said out
+loud. `generation.requested` is a job: one row per question, done the moment a
+runner picks it up, and the only row here that grows with use — so a published
+one is forgotten after `OUTBOX_JOB_RETENTION_DAYS`, in bounded batches, because
+a `DELETE` holding a lock on ten million rows blocks the relay that sits between
+asking a question and it starting to be answered. The other two types are kept
+for good: a conversation is hard-deleted, so the request to delete it is the
+only trace it existed, and a revoked session family says it is gone but not why.
+Pruning those would be pruning the audit trail.
 
 A job arrives from Redis, which is outside this process, so it goes through zod
 exactly as an HTTP body does — a queue outlives a deployment, and yesterday's
@@ -163,6 +191,18 @@ result cannot support `58.7%` in the sentence); multiply before dividing two
 amounts (they are integers, so the fraction is otherwise lost, which the model
 discovers by reading a column of zeroes and asking again); and order with `NULLS
 LAST` (or "the five largest" begins with the three that have no figure at all).
+
+One of them is not about arithmetic: the prompt says where the question starts
+and that nothing inside it changes the rules. That is a rule for the model to
+follow, and it is not what makes an injection harmless. A question is stripped
+of invisible characters once, at the door — `asModelSafeText`, so what is
+stored, shown back, used as a title and read by the model is one string — and
+nothing visible is touched, including text that looks like an attack. Nothing
+here builds a prompt by concatenation, so there is no template to close, and
+what stops the attack that matters, a figure with nothing behind it, is the
+claim gate, which does not care whether the model was fooled.
+`generation/__tests__/prompt-injection.spec.ts` runs twenty payloads through the
+real policy, gate and verifier with a model that did what each one asked.
 
 **The provider is behind an anti-corruption layer.** No type from the SDK appears
 outside `generation/infrastructure`: what leaves the gateway is text, finished
@@ -349,6 +389,17 @@ the limit on the other door decorative. It is counted **per host only**:
 counting it per address would hand anyone a way to lock a known account out of
 signing in by registering its email over and over.
 
+Asking is counted the same way and by the same Lua — `recordInWindow` is one
+script, trim then count then insert, shared by both throttles because three
+commands let two callers read the same four and both become the fifth. Sends are
+counted per person rather than per host: this system has no edge, so an address
+here belongs to a proxy, and a signed-in user is the only actor it can name.
+`SENDS_PER_MINUTE` is a burst limit and not a spending one — the budget stops a
+costly conversation, this stops a cheap one arriving ten thousand times — and it
+is the first of the three refusals in `StartGenerationUseCase`, before the
+budget and before any write, because the expensive part of a flood happens
+before a single token is bought.
+
 **A token never reaches JavaScript.** Both session tokens leave as `httpOnly`
 cookies and never appear in a body, so a script that gets onto the page cannot
 read one; the refresh cookie is additionally pinned to `/api/v1/auth`, because
@@ -359,6 +410,17 @@ the browser send cookies but cannot read one, so the echo is proof the request
 came from our own script. The check applies whenever a session cookie is
 present rather than to a list of routes — a list is a thing to forget when the
 next endpoint lands.
+
+Every answer carries four headers, set in `bootstrap/fastify.ts` and asserted in
+`domain-error.filter.spec.ts`: a CSP of `default-src 'none'; frame-ancestors
+'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and
+`Referrer-Policy: same-origin`. This process answers JSON and SSE, so the policy
+is the strict one — nothing here is meant to be rendered, and a JSON body a
+browser is willing to sniff into HTML is how one gets rendered anyway. There is
+no `Strict-Transport-Security`: TLS belongs to whatever terminates it in front
+of this process, and a header sent from here over plain HTTP is ignored by
+browsers while reading, to anyone auditing, as though the question had been
+answered.
 
 `ZodBody` binds a handler to the schema in `@fca/contracts` instead of a DTO, so
 a renamed field breaks the build rather than a request. It reports which fields

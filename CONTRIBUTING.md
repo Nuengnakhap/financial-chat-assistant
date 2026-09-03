@@ -216,6 +216,26 @@ present exactly when an assistant message is complete — has no JSON Schema
 spelling, so it is held by the type, by `message.spec.ts` and by a `CHECK`
 constraint instead. A green snapshot is not evidence of it.
 
+## Changing what a question is allowed to be
+
+A question is stripped of invisible characters once, at the door
+(`asModelSafeText` in `StartGenerationUseCase`), and never again — so what is
+stored, shown back, used as the conversation's title and read by the model are
+one string. Sanitising further downstream is how those four come to differ.
+
+Nothing **visible** is changed, including text that looks like an attack.
+`<|im_start|>` stays `<|im_start|>`, because mangling what somebody typed makes
+the screen and the row disagree — and because that is not what stops it.
+Nothing here builds a prompt by concatenation, so there is no template to
+close, and what stops the attack that matters, a figure with nothing behind it,
+is the claim gate, which does not care whether the model was fooled.
+
+Prove that rather than assume it:
+`apps/api/src/generation/__tests__/prompt-injection.spec.ts` runs twenty
+payloads through the real runner, the real SQL policy, the real gate and the
+real verifier, with a model that **did what the injection asked**. Adding a
+payload is one entry in an array.
+
 ## Changing the database
 
 `apps/api/drizzle/README.md` has the whole of it. In short: read the SQL
@@ -224,11 +244,14 @@ until the note matches what the file actually locks.
 
 ## What to do instead
 
-| Tempting                                             | Why it is a trap                                                                                             |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| A special case in `AgentRunner` for one tool         | That is what `AgentTool` is for. If a tool cannot be added without editing the runner, the port is wrong     |
-| Parsing SQL outside `PgAstSqlPolicy`                 | Two answers to "what may run", and the second one is the one that gets it wrong                              |
-| A number formatted anywhere but `packages/grounding` | The formatter and the verifier must agree by construction, not by luck                                       |
-| `assertNever` in the SSE reducer                     | It breaks forward compatibility, which is the point of the union                                             |
-| A `float` anywhere near the budget                   | `MicroUsd` exists because `0.1 + 0.2 !== 0.3`                                                                |
-| Reading coverage from a constant                     | It comes from the database at runtime, so reseeding moves the prompt, the refusals and the verifier together |
+| Tempting                                             | Why it is a trap                                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A special case in `AgentRunner` for one tool         | That is what `AgentTool` is for. If a tool cannot be added without editing the runner, the port is wrong           |
+| Parsing SQL outside `PgAstSqlPolicy`                 | Two answers to "what may run", and the second one is the one that gets it wrong                                    |
+| A number formatted anywhere but `packages/grounding` | The formatter and the verifier must agree by construction, not by luck                                             |
+| `assertNever` in the SSE reducer                     | It breaks forward compatibility, which is the point of the union                                                   |
+| A `float` anywhere near the budget                   | `MicroUsd` exists because `0.1 + 0.2 !== 0.3`                                                                      |
+| A `pg.Pool` without an `error` listener              | A connection that dies while idle ends the Node process. Measured: stopping Postgres under a running API killed it |
+| A counter keyed on anything from a request           | `Counters` takes a name from a closed union and a label from a fixed set, for the reason `LogContext` does         |
+| An e2e test that asserts what the model said         | That is `pnpm eval:live`, which reports. The browser suite asserts the machinery around the answer                 |
+| Reading coverage from a constant                     | It comes from the database at runtime, so reseeding moves the prompt, the refusals and the verifier together       |

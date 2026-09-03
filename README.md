@@ -29,6 +29,8 @@ This repository is under active development. What works today:
 | Chat screen (streaming, tables, charts, provenance)       | Working and verified |
 | Usage limits and the usage meter                          | Working and verified |
 | Extensibility (contract gate, port suites, tool registry) | Working and verified |
+| Hardening (injection corpus, headers, throttle, counters) | Working and verified |
+| Browser scenarios (S4 by hand) and the failure drills     | Working and verified |
 
 The commands below are the ones that run today. This section will grow as
 features land.
@@ -52,6 +54,15 @@ pnpm check                # format, types, lint, boundaries, dead code, migratio
 ```
 
 `pnpm check` needs no containers — it runs entirely on source.
+
+Three more need the stack up, and are deliberately outside that gate:
+
+```bash
+pnpm test:e2e                 # S1, S2, S3, S5, S6 and isolation, in a real browser
+pnpm eval:live                # the golden questions through the real model — spends money
+pnpm drill redis              # stop a dependency under a running API and watch it recover
+pnpm drill postgres
+```
 
 `pnpm db:seed` is safe to re-run: the dump drops and recreates its table, and
 grants are re-applied afterwards.

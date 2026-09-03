@@ -46,6 +46,18 @@ and this suite has no drafts: it is deterministic, with recorded query results, 
 model, no network and no database. Those two arrive with the generation pipeline.
 Printing a placeholder for them would be worse than leaving them out.
 
+## The live counterpart
+
+`pnpm eval:live` asks the same kind of questions through the running stack and
+the real model, and it is a different instrument on purpose. This suite is a
+gate: deterministic, offline, and it fails the build. That one spends money,
+needs `pnpm dev` up, and **reports rather than gates** — it prints verified
+answers, repairs, queries per answer, time to first token and the cost, and it
+fails only if a question this dataset cannot answer was answered with anything
+other than saying so. A `fail` verdict there means the verifier refused a draft
+and the fallback took over, which is the system working; turning that into an
+exit code would make the build a measurement of a provider's mood on the day.
+
 ## The corpus
 
 `golden/results.ts` holds query results recorded from the real table, chosen so
