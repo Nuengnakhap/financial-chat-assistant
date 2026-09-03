@@ -95,6 +95,15 @@ Do not upgrade a major version as a side effect of another task.
 - CPU-bound work never runs on the event loop. The tokenizer goes to `CpuPool`;
   password hashing uses argon2's own async API, which has its own threads.
 - `TODO` must carry an issue reference: `// TODO(#123): ...`
+- Extending the system — a tool, a provider, a metric, an SSE event, a context,
+  a chart type — follows `CONTRIBUTING.md`. Each of those is a fixed, short list
+  of files; needing to edit `AgentRunner` to add a tool means the port is wrong,
+  not that the runner needs a special case.
+- A change to `packages/contracts` is classified by the snapshot gate. Anything
+  it has not been taught is breaking, and recording a breaking change needs
+  `CONTRACTS_ALLOW_BREAKING=1` said out loud.
+- Every migration carries `apps/api/drizzle/notes/<tag>.md` naming the locks it
+  takes and how to undo it. `pnpm check` compares the note against the SQL.
 - Tests go in a `__tests__` directory next to the code they cover, named
   `<module>.spec.ts` (`.spec.tsx` for a component). Never beside the source file.
   A test that needs a real database is `<module>.int.spec.ts` and runs only under
@@ -106,9 +115,10 @@ Do not upgrade a major version as a side effect of another task.
 ## Commands
 
 ```bash
-pnpm check            # build + format + typecheck + lint + test — before saying done
+pnpm check            # build + format + typecheck + lint + db:check + test — before saying done
 pnpm infra:up         # Postgres + Redis via Docker Compose
 pnpm db:generate      # write a migration from the schema
+pnpm db:check         # drizzle-kit check: two branches that both generated one
 pnpm db:migrate       # apply migrations as the schema owner (MIGRATION_DATABASE_URL)
 pnpm db:seed          # load financial_data.sql + grants + indexes
 pnpm dev              # api :3000 + web :5173
@@ -118,6 +128,7 @@ pnpm test:integration # persistence against a real PostgreSQL (needs Docker)
 pnpm test:e2e         # Playwright, scenarios S1–S6
 pnpm eval             # deterministic grounding suite (CI gate)
 pnpm lint             # eslint + dependency-cruiser + knip
+pnpm contracts:snapshot  # re-record the published contract surface after a safe change
 ```
 
 `pnpm test:e2e` is the one entry that does not exist yet. Everything else in

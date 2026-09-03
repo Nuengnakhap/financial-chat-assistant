@@ -10,24 +10,25 @@ dataset does not cover a question, the assistant says so instead of estimating.
 
 This repository is under active development. What works today:
 
-| Area                                                    | State                |
-| ------------------------------------------------------- | -------------------- |
-| Data stack (PostgreSQL, Redis, seed, privilege model)   | Working and verified |
-| Toolchain (types, lint, boundaries, dead code, tests)   | Working and verified |
-| Domain model (results, errors, ids, money, lifecycles)  | Working and verified |
-| Contracts and configuration (HTTP, SSE, environment)    | Working and verified |
-| API platform (Nest on Fastify, health, errors, logging) | Working and verified |
-| Persistence (schema, constraints, unit of work, outbox) | Working and verified |
-| Runtime (Redis, background tasks, shutdown, CPU pool)   | Working and verified |
-| Authentication (register, sign-in, sessions, isolation) | Working and verified |
-| Web client (shell, dev proxy, layer boundaries)         | Working and verified |
-| Conversations (rail, history, delete pipeline)          | Working and verified |
-| Grounding (evidence, claim gate, verification, eval)    | Working and verified |
-| SQL policy and query tool (AST, read-only role, cache)  | Working and verified |
-| The model (catalog, prompt, gateway, agent loop)        | Working and verified |
-| Durable stream (send, attach, resume, stop, recovery)   | Working and verified |
-| Chat screen (streaming, tables, charts, provenance)     | Working and verified |
-| Usage limits and the usage meter                        | Working and verified |
+| Area                                                      | State                |
+| --------------------------------------------------------- | -------------------- |
+| Data stack (PostgreSQL, Redis, seed, privilege model)     | Working and verified |
+| Toolchain (types, lint, boundaries, dead code, tests)     | Working and verified |
+| Domain model (results, errors, ids, money, lifecycles)    | Working and verified |
+| Contracts and configuration (HTTP, SSE, environment)      | Working and verified |
+| API platform (Nest on Fastify, health, errors, logging)   | Working and verified |
+| Persistence (schema, constraints, unit of work, outbox)   | Working and verified |
+| Runtime (Redis, background tasks, shutdown, CPU pool)     | Working and verified |
+| Authentication (register, sign-in, sessions, isolation)   | Working and verified |
+| Web client (shell, dev proxy, layer boundaries)           | Working and verified |
+| Conversations (rail, history, delete pipeline)            | Working and verified |
+| Grounding (evidence, claim gate, verification, eval)      | Working and verified |
+| SQL policy and query tool (AST, read-only role, cache)    | Working and verified |
+| The model (catalog, prompt, gateway, agent loop)          | Working and verified |
+| Durable stream (send, attach, resume, stop, recovery)     | Working and verified |
+| Chat screen (streaming, tables, charts, provenance)       | Working and verified |
+| Usage limits and the usage meter                          | Working and verified |
+| Extensibility (contract gate, port suites, tool registry) | Working and verified |
 
 The commands below are the ones that run today. This section will grow as
 features land.
@@ -47,7 +48,7 @@ pnpm infra:up             # PostgreSQL 18 on :5432, Redis 8 on :6379
 pnpm db:seed              # load the financial dataset, grants and indexes
 pnpm db:verify            # prove the stack behaves as designed
 pnpm db:migrate           # create the application tables
-pnpm check                # format, types, lint, boundaries, dead code, tests
+pnpm check                # format, types, lint, boundaries, dead code, migrations, tests
 ```
 
 `pnpm check` needs no containers — it runs entirely on source.
@@ -124,6 +125,7 @@ infra/               Docker Compose stack and database bootstrap scripts
 scripts/             Seeding and verification
 tools/               Lint rules and the tests that prove the boundary rules work
 AGENTS.md            Operating rules for AI assistants working in this repository
+CONTRIBUTING.md      How to extend it: tools, providers, metrics, events, contexts
 ```
 
 ### How the layers are kept apart
