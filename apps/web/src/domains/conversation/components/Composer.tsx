@@ -149,7 +149,14 @@ function useGrowsWithText(text: string): React.RefObject<HTMLTextAreaElement | n
     // Reset first, or the box can grow but never shrink.
     element.style.height = 'auto';
     const line = Number.parseFloat(getComputedStyle(element).lineHeight) || FALLBACK_LINE_PX;
-    element.style.height = `${String(Math.min(element.scrollHeight, line * MAX_ROWS))}px`;
+    const ceiling = line * MAX_ROWS;
+    const wanted = element.scrollHeight;
+    // Rounded up: a height a fraction under what the text needs is an overflow
+    // of one pixel, and one pixel of overflow is a scrollbar sitting in the
+    // composer of an empty box.
+    element.style.height = `${String(Math.ceil(Math.min(wanted, ceiling)))}px`;
+    // And a box that grows to fit has nothing to scroll until it stops growing.
+    element.style.overflowY = wanted > ceiling ? 'auto' : 'hidden';
   }, [text]);
 
   return box;
