@@ -1,11 +1,15 @@
-import { groundingReport, messagePart, type MessageView } from '@fca/contracts';
+import type { MessageView } from '@fca/contracts';
 import type { ConversationId, MessageId, MessageStatus, ReservationId, UserId } from '@fca/domain';
 import { Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, lt } from 'drizzle-orm';
-import { z } from 'zod';
 
 import { DatabaseService } from '../../shared/persistence/database.service';
 import { conversations, messages, usageEvents } from '../../shared/persistence/schema';
+import {
+  readParts,
+  readPartsOrNothing,
+  readVerification,
+} from '../../shared/persistence/stored-json';
 import type {
   Answer,
   FinishedAnswer,
@@ -26,8 +30,6 @@ import type { PastTurn } from '../application/transcript';
 
 /** Enough turns for a follow-up question to make sense, matching the transcript's own bound. */
 const HISTORY_TURNS = 20;
-
-const parts = z.array(messagePart);
 
 @Injectable()
 export class DrizzleGenerationMessages implements GenerationMessages {
@@ -229,8 +231,8 @@ function toView(row: ViewRow): MessageView {
     // Parsed rather than asserted, both of them: these are `jsonb`, so their
     // shape is a claim about what was written rather than something the row can
     // prove, and half a rendered answer is worse than a loud refusal.
-    parts: parts.parse(row.parts),
-    verification: groundingReport.nullable().parse(row.verification ?? null),
+    parts: readParts(row.parts),
+    verification: readVerification(row.verification),
     usage: usageOf(row),
     error: null,
     createdAt: row.createdAt.toISOString(),
@@ -261,13 +263,10 @@ function usageOf(row: ViewRow): MessageView['usage'] {
  * the model as an empty message, which some providers refuse outright.
  */
 function toTurn(row: { role: 'user' | 'assistant'; parts: unknown }): Turn {
-  const said = parts.safeParse(row.parts);
-  const text = said.success
-    ? said.data
-        .filter((part) => part.kind === 'text')
-        .map((part) => part.text)
-        .join('')
-    : '';
+  const text = readPartsOrNothing(row.parts)
+    .filter((part) => part.kind === 'text')
+    .map((part) => part.text)
+    .join('');
 
   return { role: row.role, text };
 }

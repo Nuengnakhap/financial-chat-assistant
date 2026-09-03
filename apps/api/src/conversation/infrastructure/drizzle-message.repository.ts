@@ -1,4 +1,3 @@
-import { groundingReport } from '@fca/contracts';
 import type {
   ClientMessageId,
   ConversationId,
@@ -12,6 +11,7 @@ import { delay } from '../../shared/async/timeouts';
 import type { DbOrTx } from '../../shared/persistence/db-or-tx';
 import { isUniqueViolationOf } from '../../shared/persistence/pg-errors';
 import { conversations, messages } from '../../shared/persistence/schema';
+import { readVerification } from '../../shared/persistence/stored-json';
 import { pageOf, type MessageCursor, type Page } from '../application/pagination';
 import type {
   AppendMessage,
@@ -210,7 +210,7 @@ function toStored(row: MessageColumns): StoredMessage {
     // claim about what was written rather than something the row can prove. A
     // report that does not parse is not a report, and rendering half of one is
     // how an answer would look verified without being it.
-    verification: groundingReport.nullable().parse(row.verification ?? null),
+    verification: readVerification(row.verification),
   };
   /* eslint-enable @typescript-eslint/consistent-type-assertions */
 }

@@ -1,9 +1,7 @@
-import { messagePart, type MessageView } from '@fca/contracts';
-import { z } from 'zod';
+import type { MessageView } from '@fca/contracts';
 
+import { readParts } from '../../shared/persistence/stored-json';
 import type { StoredMessage } from '../application/ports/message.repository';
-
-const parts = z.array(messagePart);
 
 /**
  * The one place a stored message becomes what leaves over HTTP.
@@ -20,7 +18,7 @@ export function toMessageView(message: StoredMessage): MessageView {
     seq: message.seq,
     role: message.role,
     status: message.status,
-    parts: parts.parse(message.parts),
+    parts: readParts(message.parts),
     // The pairing the database holds: an assistant message is `complete`
     // exactly when this is present, so the view's own rule is satisfied by the
     // row rather than by this function remembering to.
