@@ -1,12 +1,14 @@
 import type { GroundingReport, MessageView, StreamEvent } from '@fca/contracts';
-import { ConversationId, MessageId, UserId } from '@fca/domain';
+import { ConversationId, MessageId, MicroUsd, ReservationId, UserId } from '@fca/domain';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AgentEvent } from '../agent-events';
 import type { AgentRunner } from '../agent-runner';
+import { AnswerBooks } from '../answer-books';
 import type { GenerationEvents } from '../ports/generation-events.port';
 import type { Answer, FinishedAnswer, GenerationMessages } from '../ports/generation-messages.port';
 import { RunGenerationUseCase } from '../run-generation.use-case';
+import { budgetDouble, type BudgetDouble } from './budget-double';
 
 /**
  * What a generation leaves behind: a stream a client can read from either end,
@@ -23,6 +25,12 @@ const ANSWER: Answer = {
   seq: 2,
   status: 'generating',
   startedAt: new Date('2026-09-02T10:00:00.000Z'),
+  // A claim on the asker's budget, which every ending has to give back.
+  reservation: {
+    userId: UserId.trusted('e5c9f4a1-1f0e-4a6a-9d4e-0c8b6a3f21d0'),
+    id: ReservationId.trusted('2f1c2a1e-3b4d-4e5f-8a9b-0c1d2e3f4a5b'),
+    windowStart: new Date('2026-09-02T10:00:00.000Z'),
+  },
 };
 
 const REPORT: GroundingReport = {
@@ -69,12 +77,18 @@ const runner = {
 } as unknown as AgentRunner;
 
 const run = () =>
-  new RunGenerationUseCase(runner, messages, events).execute(ANSWER, new AbortController().signal);
+  new RunGenerationUseCase(runner, new AnswerBooks(messages, budget), events).execute(
+    ANSWER,
+    new AbortController().signal,
+  );
 
 const streamed = (): readonly StreamEvent[] => append.mock.calls.map(([, event]) => event);
 const written = (): FinishedAnswer | undefined => finish.mock.calls[0]?.[0];
 
+let budget: BudgetDouble;
+
 beforeEach(() => {
+  budget = budgetDouble();
   vi.resetAllMocks();
   questionFor.mockResolvedValue({ text: "Apple's revenue?", history: [] });
   finish.mockResolvedValue(STORED);
@@ -96,7 +110,13 @@ describe('an answer that was checked', () => {
       },
       { type: 'text_delta', delta: "Apple's revenue was $391.0B." },
       { type: 'verification', report: REPORT },
-      { type: 'usage', inputTokens: 1_800, outputTokens: 90, cachedInputTokens: 1_500 },
+      {
+        type: 'usage',
+        inputTokens: 1_800,
+        outputTokens: 90,
+        cachedInputTokens: 1_500,
+        model: 'gpt-5.6-luna',
+      },
       {
         type: 'finished',
         outcome: 'answered',
@@ -109,15 +129,17 @@ describe('an answer that was checked', () => {
   it('puts everything a client can read on the stream, and nothing it cannot', async () => {
     await run();
 
-    // `usage` and `finished` stop here: one has no price on it yet, and the
-    // other is this process telling itself the loop is over. What a client
-    // reads instead is the message that was stored because of it.
+    // The runner's own `usage` events stop here — a client is told once, at the
+    // end, with a price on it — and `finished` never leaves at all: it is this
+    // process telling itself the loop is over, and what a client reads instead
+    // is the message that was stored because of it.
     expect(streamed().map((event) => event.type)).toEqual([
       'generation_started',
       'tool_call_ready',
       'tool_result',
       'text_delta',
       'verification',
+      'usage',
       'message_complete',
     ]);
   });
@@ -153,9 +175,14 @@ describe('an answer that was checked', () => {
         { kind: 'text', text: "Apple's revenue was $391.0B." },
       ],
       verification: REPORT,
-      model: 'a-model',
+      model: 'gpt-5.6-luna',
       inputTokens: 1_800,
+      cachedInputTokens: 1_500,
       outputTokens: 90,
+      cost: MicroUsd.fromMicro(1_890n),
+      // The ledger entry that has to be written with the row rather than after
+      // it: an answer stored without its charge is one somebody got for free.
+      charge: { userId: ANSWER.ownerId, windowStart: ANSWER.reservation?.windowStart },
     });
   });
 
@@ -165,8 +192,20 @@ describe('an answer that was checked', () => {
     // round that carried the whole prompt prefix.
     produced = [
       { type: 'generation_started', model: 'a-model' },
-      { type: 'usage', inputTokens: 1_800, outputTokens: 40, cachedInputTokens: 0 },
-      { type: 'usage', inputTokens: 1_900, outputTokens: 90, cachedInputTokens: 1_536 },
+      {
+        type: 'usage',
+        inputTokens: 1_800,
+        outputTokens: 40,
+        cachedInputTokens: 0,
+        model: 'gpt-5.6-luna',
+      },
+      {
+        type: 'usage',
+        inputTokens: 1_900,
+        outputTokens: 90,
+        cachedInputTokens: 1_536,
+        model: 'gpt-5.6-luna',
+      },
       {
         type: 'finished',
         outcome: 'answered',
@@ -199,6 +238,61 @@ describe('an answer that was checked', () => {
 
     expect(streamed().map((event) => event.type)).not.toContain('message_complete');
   });
+
+  it('charges the budget only after the row says this process ended it', async () => {
+    await run();
+
+    expect(budget.settled).toEqual([
+      { reservation: ANSWER.reservation, cost: MicroUsd.fromMicro(1_890n) },
+    ]);
+  });
+
+  it('charges nothing when another writer ended the generation first', async () => {
+    // The counter would then hold this process's figure while the row and the
+    // ledger hold somebody else's, and a window rebuilt from the ledger would
+    // disagree with the counter it was rebuilding.
+    finish.mockResolvedValue(null);
+
+    await run();
+
+    expect(budget.settled).toEqual([]);
+  });
+
+  it('reports what was spent, and what is left, before the stream ends', async () => {
+    await run();
+
+    const spent = streamed().at(-2);
+    expect(spent).toEqual({
+      type: 'usage',
+      inputTokens: 1_800,
+      outputTokens: 90,
+      costMicroUsd: '1890',
+      budget: {
+        spentMicroUsd: '1000',
+        reservedMicroUsd: '0',
+        limitMicroUsd: '1000000',
+        resetAt: '2026-09-02T15:00:00.000Z',
+        exceeded: false,
+      },
+    });
+  });
+
+  it('prices what the provider reported and asks for nothing to be counted', async () => {
+    await run();
+
+    // Every round reported, so there is nothing left to estimate — counting the
+    // final text again would charge for it twice.
+    expect(budget.priced).toEqual([
+      {
+        model: 'gpt-5.6-luna',
+        inputTokens: 1_800,
+        cachedInputTokens: 1_500,
+        outputTokens: 90,
+        unreportedText: '',
+        estimatedInputTokens: 1_800,
+      },
+    ]);
+  });
 });
 
 describe('a generation that was stopped', () => {
@@ -214,6 +308,34 @@ describe('a generation that was stopped', () => {
     expect(written()?.status).toBe('stopped');
     expect(written()?.parts).toEqual([{ kind: 'text', text: 'Apple' }]);
     expect(written()?.verification).toBeNull();
+  });
+
+  it('charges for the round the provider never reported', async () => {
+    // Stopping abandons a response the provider had already begun sending, so
+    // its usage never arrives. Charging nothing for it would make the stop
+    // button a way of reading an answer for free.
+    produced = [
+      { type: 'generation_started', model: 'a-model' },
+      {
+        type: 'usage',
+        inputTokens: 1_800,
+        outputTokens: 40,
+        cachedInputTokens: 0,
+        model: 'gpt-5.6-luna',
+      },
+      { type: 'text_delta', delta: 'Apple earned' },
+      { type: 'finished', outcome: 'stopped', text: 'Apple earned', report: null },
+    ];
+
+    await run();
+
+    expect(budget.priced[0]).toMatchObject({
+      unreportedText: 'Apple earned',
+      // The round before it is the closest bound on what the cut-off round sent,
+      // since the transcript only ever grows.
+      estimatedInputTokens: 1_800,
+    });
+    expect(budget.settled).toHaveLength(1);
   });
 });
 

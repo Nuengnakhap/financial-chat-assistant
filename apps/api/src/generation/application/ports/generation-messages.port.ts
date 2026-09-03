@@ -1,5 +1,12 @@
 import type { GroundingReport, MessagePart, MessageView } from '@fca/contracts';
-import type { ConversationId, MessageId, MessageStatus, UserId } from '@fca/domain';
+import type {
+  ConversationId,
+  MessageId,
+  MessageStatus,
+  MicroUsd,
+  Reservation,
+  UserId,
+} from '@fca/domain';
 
 import type { PastTurn } from '../transcript';
 
@@ -22,6 +29,12 @@ export interface Answer {
   readonly seq: number;
   readonly status: MessageStatus;
   readonly startedAt: Date;
+  /**
+   * The claim held on the asker's budget for this answer, read off the row
+   * rather than remembered: what ends a generation whose process is gone is a
+   * janitor that never saw the request that made the claim.
+   */
+  readonly reservation: Reservation | null;
 }
 
 export interface Question {
@@ -38,7 +51,28 @@ export interface FinishedAnswer {
   readonly verification: GroundingReport | null;
   readonly model: string;
   readonly inputTokens: number;
+  readonly cachedInputTokens: number;
   readonly outputTokens: number;
+  /** What the rounds came to, priced. Written with the row, in one transaction. */
+  readonly cost: MicroUsd;
+  /**
+   * The ledger row this generation owes, or `null` when it owes none — a
+   * generation with no claim behind it never held any budget to spend.
+   */
+  readonly charge: UsageCharge | null;
+}
+
+/**
+ * A generation's entry in the ledger the budget is rebuilt from.
+ *
+ * Written in the same transaction as the message it belongs to, because the two
+ * are one fact: an answer that was stored and a charge that was not is a
+ * generation somebody got for nothing, and the reverse is a charge for an answer
+ * that never existed.
+ */
+interface UsageCharge {
+  readonly userId: UserId;
+  readonly windowStart: Date;
 }
 
 export interface GenerationMessages {

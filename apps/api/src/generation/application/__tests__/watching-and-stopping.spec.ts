@@ -24,6 +24,9 @@ const answer = (status: MessageStatus, ownerId = ADA): Answer => ({
   seq: 2,
   status,
   startedAt: new Date('2026-09-02T10:00:00.000Z'),
+  // Neither file is about the budget; what they need is an answer that is
+  // shaped like one.
+  reservation: null,
 });
 
 /** A whole view, because the contract's own refinement insists on one. */

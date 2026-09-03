@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AgentRunner } from './application/agent-runner';
+import { AnswerBooks } from './application/answer-books';
 import { GenerationContextFactory } from './application/generation-context';
 import { GenerationJanitor } from './application/generation-janitor';
 import { GenerationSupervisor } from './application/generation-supervisor';
@@ -85,6 +86,7 @@ import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
     { provide: GENERATION_MESSAGES, useExisting: DrizzleGenerationMessages },
     RedisGenerationStops,
     { provide: GENERATION_STOPS, useExisting: RedisGenerationStops },
+    AnswerBooks,
     RunGenerationUseCase,
     GenerationSupervisor,
     GenerationSubscriber,
@@ -98,6 +100,16 @@ import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
   // `SseStream` leaves so that shutdown can tell every open reader to come back
   // before the server stops accepting connections; the subscriber leaves for the
   // handler list the composition root builds.
-  exports: [FINANCIAL_QUERY_TOOL, SQL_POLICY, LLM_GATEWAY, GenerationSubscriber, SseStream],
+  exports: [
+    FINANCIAL_QUERY_TOOL,
+    SQL_POLICY,
+    LLM_GATEWAY,
+    GenerationSubscriber,
+    SseStream,
+    // Leaves this module for one reason: what a router resolved `auto` to is
+    // what the budget has to put a price on before a question is asked, and
+    // this is the only thing that has spoken to the endpoint.
+    LlmCapabilityService,
+  ],
 })
 export class GenerationModule {}

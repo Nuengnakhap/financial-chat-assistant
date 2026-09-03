@@ -2,6 +2,7 @@ import type { MessagePart, StreamEvent } from '@fca/contracts';
 import type { MessageId } from '@fca/domain';
 import { Inject, Injectable } from '@nestjs/common';
 
+import { USAGE_SETTLEMENT, type UsageSettlement } from '../ports/budget.port';
 import {
   GENERATION_EVENTS,
   type GenerationEvents,
@@ -41,6 +42,7 @@ export class EndAbandonedGenerationsUseCase {
   constructor(
     @Inject(GENERATION_MESSAGES) private readonly messages: GenerationMessages,
     @Inject(GENERATION_EVENTS) private readonly events: GenerationEvents,
+    @Inject(USAGE_SETTLEMENT) private readonly budget: UsageSettlement,
   ) {}
 
   /** The generations it ended, so the caller can say which rather than how many. */
@@ -77,24 +79,58 @@ export class EndAbandonedGenerationsUseCase {
    */
   private async end(answer: Answer): Promise<boolean> {
     const seen = await this.events.replay(answer.id);
+    const parts = partsOf(seen);
+    // What the dead process was charged for cannot be read from here: it never
+    // reached the round that reports usage, and the counts it did receive died
+    // with it. What is left is the text that reached the stream, which is real
+    // output somebody paid for — priced at the dearest rate, since the model
+    // that produced it is not knowable either. It is less than the truth and
+    // very much more than nothing.
+    const charged = await this.budget.price({
+      model: '',
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      unreportedText: textIn(parts),
+      estimatedInputTokens: 0,
+    });
+
     const stored = await this.messages.finish({
       messageId: answer.id,
       status: 'stopped',
-      parts: partsOf(seen),
+      parts,
       verification: null,
-      model: '',
-      inputTokens: 0,
-      outputTokens: 0,
+      model: charged.model,
+      inputTokens: charged.inputTokens,
+      cachedInputTokens: charged.cachedInputTokens,
+      outputTokens: charged.outputTokens,
+      cost: charged.cost,
+      charge:
+        answer.reservation === null
+          ? null
+          : { userId: answer.ownerId, windowStart: answer.reservation.windowStart },
     });
     // Null means the runner was alive after all and finished between the two
     // reads. It has written its own terminal event, and a second one would be a
     // second ending for one generation.
     if (stored === null) return false;
 
+    // Only now, and only here: the row is what decided this process ended the
+    // generation, so it is what decides who moves the counter.
+    if (answer.reservation !== null) await this.budget.settle(answer.reservation, charged.cost);
+
     await this.events.append(answer.id, { type: 'message_complete', message: stored });
 
     return true;
   }
+}
+
+/** The answer as text, which is the only part of it a price can be put on. */
+function textIn(parts: readonly MessagePart[]): string {
+  return parts
+    .filter((part) => part.kind === 'text')
+    .map((part) => part.text)
+    .join('');
 }
 
 /**

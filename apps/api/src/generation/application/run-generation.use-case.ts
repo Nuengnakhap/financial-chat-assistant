@@ -9,12 +9,10 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import type { AgentEvent } from './agent-events';
 import { AgentRunner } from './agent-runner';
+import { AnswerBooks } from './answer-books';
+import type { Charged } from './ports/budget.port';
 import { GENERATION_EVENTS, type GenerationEvents } from './ports/generation-events.port';
-import {
-  GENERATION_MESSAGES,
-  type Answer,
-  type GenerationMessages,
-} from './ports/generation-messages.port';
+import type { Answer } from './ports/generation-messages.port';
 
 /**
  * One generation from beginning to end, detached from any connection.
@@ -35,7 +33,15 @@ class Recording {
   readonly parts: MessagePart[] = [];
   model = '';
   inputTokens = 0;
+  cachedInputTokens = 0;
   outputTokens = 0;
+  /**
+   * What the last round the provider reported sent. A round cut off part-way
+   * reports nothing at all, and the transcript only grows, so the round before
+   * it is the closest lower bound available without tokenizing a prompt that
+   * nobody asked for.
+   */
+  lastRoundInputTokens = 0;
   text = '';
   report: GroundingReport | null = null;
   private outcome: GenerationOutcome | null = null;
@@ -55,7 +61,12 @@ class Recording {
       // is billed for the entire prompt it sent, prefix included, which makes
       // the sum the charge rather than a double count.
       this.inputTokens += event.inputTokens;
+      this.cachedInputTokens += event.cachedInputTokens;
       this.outputTokens += event.outputTokens;
+      this.lastRoundInputTokens = event.inputTokens;
+      // The name the provider answered with rather than the one it was asked
+      // for: a router takes `auto` and picks, and the bill follows the pick.
+      if (event.model !== '') this.model = event.model;
     } else if (event.type === 'finished') {
       this.outcome = event.outcome;
       this.text = event.text;
@@ -77,18 +88,34 @@ class Recording {
   get stored(): readonly MessagePart[] {
     return this.text === '' ? this.parts : [...this.parts, { kind: 'text', text: this.text }];
   }
+
+  /**
+   * Text the provider never charged for, because it never reported the round
+   * that produced it.
+   *
+   * Two ways that happens. A stop abandons a response the provider had already
+   * begun sending, so its usage chunk never arrives — and the text on screen is
+   * exactly what that round produced. And an endpoint that reports no usage at
+   * all leaves everything unreported, which is what a total of nothing means
+   * after a generation that plainly ran.
+   */
+  get unreportedText(): string {
+    const silent = this.inputTokens === 0 && this.outputTokens === 0;
+
+    return this.outcome === 'stopped' || silent ? this.text : '';
+  }
 }
 
 @Injectable()
 export class RunGenerationUseCase {
   constructor(
     private readonly runner: AgentRunner,
-    @Inject(GENERATION_MESSAGES) private readonly messages: GenerationMessages,
+    private readonly books: AnswerBooks,
     @Inject(GENERATION_EVENTS) private readonly events: GenerationEvents,
   ) {}
 
   async execute(answer: Answer, signal: AbortSignal): Promise<void> {
-    const question = await this.messages.questionFor(answer);
+    const question = await this.books.questionFor(answer);
     if (question === null) {
       // The row before this one is not a question, so there is nothing to
       // answer. It cannot be left `generating`, which is a state the janitor
@@ -109,26 +136,48 @@ export class RunGenerationUseCase {
   }
 
   /**
-   * The books, closed. A row that loses this write lost it to a stop or a
+   * The books, closed. A row that loses that write lost it to a stop or a
    * janitor that had already ended the same generation, and the terminal event
    * it put on the stream is the one clients are reading.
    */
   private async settle(answer: Answer, recording: Recording): Promise<void> {
-    const stored = await this.messages.finish({
-      messageId: answer.id,
+    const { stored, charged } = await this.books.close(answer, {
       status: recording.status,
       parts: recording.stored,
       // Present exactly when the status is `complete`, which is what the
       // database's own CHECK constraint insists on. Deriving both from one
       // reading of the recording is what keeps them agreeing.
       verification: recording.status === 'complete' ? recording.report : null,
-      model: recording.model,
-      inputTokens: recording.inputTokens,
-      outputTokens: recording.outputTokens,
+      used: {
+        model: recording.model,
+        inputTokens: recording.inputTokens,
+        cachedInputTokens: recording.cachedInputTokens,
+        outputTokens: recording.outputTokens,
+        unreportedText: recording.unreportedText,
+        estimatedInputTokens: recording.lastRoundInputTokens,
+      },
     });
 
     if (stored === null || recording.failed) return;
+
+    await this.events.append(answer.id, await this.spent(answer, charged));
     await this.events.append(answer.id, { type: 'message_complete', message: stored });
+  }
+
+  /**
+   * What it cost and what is left, once. The window is read after the books are
+   * closed, so the figures a client is given are the ones a page reloading would
+   * find — and it goes out before `message_complete`, because that one is
+   * terminal and a reader stops there.
+   */
+  private async spent(answer: Answer, charged: Charged): Promise<StreamEvent> {
+    return {
+      type: 'usage',
+      inputTokens: charged.inputTokens,
+      outputTokens: charged.outputTokens,
+      costMicroUsd: charged.cost.toString(),
+      budget: await this.books.remaining(answer.ownerId),
+    };
   }
 
   /**
@@ -140,15 +189,7 @@ export class RunGenerationUseCase {
    * terminal event behind somebody else's.
    */
   private async giveUp(answer: Answer, code: string): Promise<void> {
-    const stored = await this.messages.finish({
-      messageId: answer.id,
-      status: 'error',
-      parts: [],
-      verification: null,
-      model: '',
-      inputTokens: 0,
-      outputTokens: 0,
-    });
+    const stored = await this.books.giveUp(answer);
     if (stored === null) return;
 
     await this.events.append(answer.id, {

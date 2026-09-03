@@ -1,11 +1,11 @@
 import { groundingReport, messagePart, type MessageView } from '@fca/contracts';
-import type { ConversationId, MessageId, MessageStatus, UserId } from '@fca/domain';
+import type { ConversationId, MessageId, MessageStatus, ReservationId, UserId } from '@fca/domain';
 import { Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, lt } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { DatabaseService } from '../../shared/persistence/database.service';
-import { conversations, messages } from '../../shared/persistence/schema';
+import { conversations, messages, usageEvents } from '../../shared/persistence/schema';
 import type {
   Answer,
   FinishedAnswer,
@@ -66,21 +66,49 @@ export class DrizzleGenerationMessages implements GenerationMessages {
     return { text: asked.text, history: turns.slice(0, -1) };
   }
 
+  /**
+   * The row and the ledger entry in one transaction, because they are one fact:
+   * an answer stored without its charge is a generation somebody got for
+   * nothing, and a charge without an answer is money taken for one that never
+   * existed. The ledger is what a window is rebuilt from when Redis has been
+   * restarted, so it has to be exactly as true as the row it belongs to.
+   */
   async finish(answer: FinishedAnswer): Promise<MessageView | null> {
-    const [row] = await this.database.db
-      .update(messages)
-      .set({
-        parts: answer.parts,
-        status: answer.status,
-        verification: answer.verification,
-        model: answer.model,
-        inputTokens: answer.inputTokens,
-        outputTokens: answer.outputTokens,
-      })
-      .where(and(eq(messages.id, answer.messageId), eq(messages.status, 'generating')))
-      .returning(VIEW_COLUMNS);
+    return await this.database.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(messages)
+        .set({
+          parts: answer.parts,
+          status: answer.status,
+          verification: answer.verification,
+          model: answer.model,
+          inputTokens: answer.inputTokens,
+          cachedInputTokens: answer.cachedInputTokens,
+          outputTokens: answer.outputTokens,
+          costMicroUsd: answer.cost.micro,
+        })
+        .where(and(eq(messages.id, answer.messageId), eq(messages.status, 'generating')))
+        .returning(VIEW_COLUMNS);
 
-    return row === undefined ? null : toView(row);
+      // Lost the race to whoever ended this generation first, so there is
+      // nothing to charge for either: their write carries their own figures.
+      if (row === undefined) return null;
+
+      if (answer.charge !== null) {
+        await tx.insert(usageEvents).values({
+          userId: answer.charge.userId,
+          messageId: answer.messageId,
+          windowStart: answer.charge.windowStart,
+          model: answer.model,
+          inputTokens: answer.inputTokens,
+          cachedInputTokens: answer.cachedInputTokens,
+          outputTokens: answer.outputTokens,
+          costMicroUsd: answer.cost.micro,
+        });
+      }
+
+      return toView(row);
+    });
   }
 
   async view(messageId: MessageId): Promise<MessageView | null> {
@@ -112,6 +140,8 @@ const ANSWER_COLUMNS = {
   seq: messages.seq,
   status: messages.status,
   startedAt: messages.createdAt,
+  reservationId: messages.reservationId,
+  reservationWindow: messages.reservationWindow,
 };
 
 const VIEW_COLUMNS = {
@@ -122,6 +152,11 @@ const VIEW_COLUMNS = {
   status: messages.status,
   parts: messages.parts,
   verification: messages.verification,
+  model: messages.model,
+  inputTokens: messages.inputTokens,
+  cachedInputTokens: messages.cachedInputTokens,
+  outputTokens: messages.outputTokens,
+  costMicroUsd: messages.costMicroUsd,
   createdAt: messages.createdAt,
 };
 
@@ -132,6 +167,8 @@ interface AnswerRow {
   seq: number;
   status: MessageStatus;
   startedAt: Date;
+  reservationId: string | null;
+  reservationWindow: Date | null;
 }
 
 interface ViewRow {
@@ -142,6 +179,11 @@ interface ViewRow {
   status: MessageStatus;
   parts: unknown;
   verification: unknown;
+  model: string | null;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  costMicroUsd: bigint;
   createdAt: Date;
 }
 
@@ -152,32 +194,66 @@ interface Turn {
 
 /* eslint-disable @typescript-eslint/consistent-type-assertions */
 function toAnswer(row: AnswerRow): Answer {
+  const ownerId = row.ownerId as UserId;
+
   return {
     ...row,
     id: row.id as MessageId,
     conversationId: row.conversationId as ConversationId,
-    ownerId: row.ownerId as UserId,
+    ownerId,
+    // Both halves or neither, which `chk_reservation_is_whole` holds. Reading
+    // it as a pair rather than as two nullable columns means nothing above here
+    // has to wonder what half a claim would mean.
+    reservation:
+      row.reservationId === null || row.reservationWindow === null
+        ? null
+        : {
+            userId: ownerId,
+            id: row.reservationId as ReservationId,
+            windowStart: row.reservationWindow,
+          },
   };
 }
 
 function toView(row: ViewRow): MessageView {
+  // Field by field rather than by spreading the row. The row carries columns
+  // this view does not — among them a `bigint` cost — and a spread would put
+  // them on an object that is JSON-encoded onto a stream, where a `bigint`
+  // throws. The view is a shape of its own, so it is built as one.
   return {
-    ...row,
     id: row.id,
     conversationId: row.conversationId,
+    seq: row.seq,
+    role: row.role,
+    status: row.status,
     // Parsed rather than asserted, both of them: these are `jsonb`, so their
     // shape is a claim about what was written rather than something the row can
     // prove, and half a rendered answer is worse than a loud refusal.
     parts: parts.parse(row.parts),
     verification: groundingReport.nullable().parse(row.verification ?? null),
-    // Written by the usage ledger, which does not exist yet; the token counts
-    // are on the row already and become this the day a price does.
-    usage: null,
+    usage: usageOf(row),
     error: null,
     createdAt: row.createdAt.toISOString(),
   };
 }
 /* eslint-enable @typescript-eslint/consistent-type-assertions */
+
+/**
+ * What a message cost, or `null` for one that never ran a model — a question,
+ * or an answer that failed before asking anything. Zero tokens and no model is
+ * what "nothing was spent" looks like on the row, and reporting that as a usage
+ * of zero would read as a measurement rather than as an absence.
+ */
+function usageOf(row: ViewRow): MessageView['usage'] {
+  if (row.model === null || row.model === '') return null;
+
+  return {
+    inputTokens: row.inputTokens,
+    cachedInputTokens: row.cachedInputTokens,
+    outputTokens: row.outputTokens,
+    costMicroUsd: row.costMicroUsd.toString(),
+  };
+}
 
 /**
  * Only what was said. A turn whose parts hold no text — an answer that failed

@@ -1,6 +1,6 @@
 import type { AppConfig } from '@fca/config';
 import type { GroundingReport } from '@fca/contracts';
-import { MessageId, type ConversationId, type UserId } from '@fca/domain';
+import { MessageId, MicroUsd, type ConversationId, type UserId } from '@fca/domain';
 import { eq } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -20,8 +20,10 @@ import { messages } from '../../shared/persistence/schema';
 import { K } from '../../shared/redis/keys';
 import { RedisService } from '../../shared/redis/redis.service';
 import { StreamMultiplexer } from '../../shared/redis/stream-multiplexer';
+import { budgetDouble, type BudgetDouble } from '../application/__tests__/budget-double';
 import type { AgentEvent } from '../application/agent-events';
 import type { AgentRunner } from '../application/agent-runner';
+import { AnswerBooks } from '../application/answer-books';
 import { GenerationSupervisor } from '../application/generation-supervisor';
 import { STREAM_START, type StoredStreamEvent } from '../application/ports/generation-events.port';
 import { RunGenerationUseCase } from '../application/run-generation.use-case';
@@ -78,6 +80,7 @@ interface Script {
   readonly everyMs: number;
 }
 
+let budget: BudgetDouble;
 let script: Script;
 /** Set by the fake runner, so a test can watch the signal the supervisor built. */
 let lastSignal: AbortSignal | null = null;
@@ -161,15 +164,16 @@ beforeEach(async () => {
   streams = new StreamMultiplexer(redis, tasks, silent);
   stream = new GenerationStream(redis, streams);
   stops = new RedisGenerationStops(redis);
+  budget = budgetDouble();
   supervisor = new GenerationSupervisor(
-    new RunGenerationUseCase(runner, store, stream),
+    new RunGenerationUseCase(runner, new AnswerBooks(store, budget), stream),
     stops,
     tasks,
   );
   subscriber = new GenerationSubscriber(store, supervisor, silent);
   watch = new WatchGenerationUseCase(store, stream);
   stopping = new StopGenerationUseCase(store, stops);
-  janitor = new EndAbandonedGenerationsUseCase(store, stream);
+  janitor = new EndAbandonedGenerationsUseCase(store, stream, budget);
 });
 
 afterEach(async () => {
@@ -263,6 +267,9 @@ describe('a question asked and answered', () => {
       'text_delta',
       'text_delta',
       'verification',
+      // What it cost and what is left, once, after the books are closed and
+      // before the terminal event a reader stops at.
+      'usage',
       'message_complete',
     ]);
     const row = await rowFor(id);
@@ -331,7 +338,10 @@ describe('two writers for one ending', () => {
       verification: null,
       model: '',
       inputTokens: 0,
+      cachedInputTokens: 0,
       outputTokens: 0,
+      cost: MicroUsd.ZERO,
+      charge: null,
     });
 
     expect(second).toBeNull();
@@ -356,6 +366,7 @@ describe('a reader that goes away in the middle', () => {
       'text_delta',
       'text_delta',
       'verification',
+      'usage',
       'message_complete',
     ]);
   });

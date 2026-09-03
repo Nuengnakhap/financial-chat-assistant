@@ -22,6 +22,9 @@ const answerFor = (id: string): Answer => ({
   seq: 2,
   status: 'generating',
   startedAt: new Date('2026-09-02T10:00:00.000Z'),
+  // Neither file is about the budget; what they need is an answer that is
+  // shaped like one.
+  reservation: null,
 });
 
 const ANSWER = answerFor('a1f0c3d2-4b5e-4a6f-9c8d-0e1f2a3b4c5d');
