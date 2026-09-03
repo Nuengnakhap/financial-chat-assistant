@@ -9,3 +9,8 @@ data/financial_data.sql
 
 # Fixtures are formatted the way their test needs.
 tools/architecture/fixtures/
+
+# Written by `pnpm contracts:snapshot`, byte for byte. Formatting it afterwards
+# makes the recorded surface differ from what the tool writes, and the next
+# person to run that command finds `format:check` red for no reason they can see.
+packages/contracts/__snapshots__/

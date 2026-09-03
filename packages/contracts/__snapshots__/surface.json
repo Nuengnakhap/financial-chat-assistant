@@ -1,0 +1,3250 @@
+{
+  "CHART_BLOCK_SHAPE": {
+    "kind": "value",
+    "value": "{\"type\":\"bar\"|\"line\",\"title\",\"xKey\",\"series\":[{\"key\",\"label\"}],\"data\":[...]}"
+  },
+  "CSRF_HEADER": {
+    "kind": "value",
+    "value": "x-csrf-token"
+  },
+  "SESSION_COOKIE.access": {
+    "kind": "value",
+    "value": "fca_access"
+  },
+  "SESSION_COOKIE.csrf": {
+    "kind": "value",
+    "value": "fca_csrf"
+  },
+  "SESSION_COOKIE.refresh": {
+    "kind": "value",
+    "value": "fca_refresh"
+  },
+  "TERMINAL_STREAM_EVENTS": {
+    "kind": "value",
+    "value": [
+      "message_complete",
+      "error"
+    ]
+  },
+  "apiErrorCode": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "enum": [
+        "validation",
+        "unauthenticated",
+        "invalid_credentials",
+        "not_found",
+        "conflict",
+        "forbidden",
+        "invalid_transition",
+        "rate_limited",
+        "budget_exceeded",
+        "unverifiable",
+        "bad_request",
+        "internal"
+      ],
+      "type": "string"
+    }
+  },
+  "apiFailure": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "validation",
+            "unauthenticated",
+            "invalid_credentials",
+            "not_found",
+            "conflict",
+            "forbidden",
+            "invalid_transition",
+            "rate_limited",
+            "budget_exceeded",
+            "unverifiable",
+            "bad_request",
+            "internal"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "requestId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "requestId"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.listSessions.method": {
+    "kind": "value",
+    "value": "GET"
+  },
+  "authContract.listSessions.path": {
+    "kind": "value",
+    "value": "/api/v1/auth/sessions"
+  },
+  "authContract.listSessions.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "sessions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "current": {
+                "type": "boolean"
+              },
+              "device": {
+                "maxLength": 200,
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "type": "string"
+              },
+              "ipHash": {
+                "maxLength": 64,
+                "type": "string"
+              },
+              "lastUsedAt": {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "device",
+              "ipHash",
+              "lastUsedAt",
+              "current"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "sessions"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.listSessions.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "authContract.login.body": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "email": {
+          "format": "email",
+          "maxLength": 254,
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 200,
+          "minLength": 12,
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "password"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.login.method": {
+    "kind": "value",
+    "value": "POST"
+  },
+  "authContract.login.path": {
+    "kind": "value",
+    "value": "/api/v1/auth/login"
+  },
+  "authContract.login.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            },
+            "displayName": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "email": {
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "email",
+            "displayName",
+            "createdAt"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.login.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "authContract.logout.body": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "authContract.logout.method": {
+    "kind": "value",
+    "value": "POST"
+  },
+  "authContract.logout.path": {
+    "kind": "value",
+    "value": "/api/v1/auth/logout"
+  },
+  "authContract.logout.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.logout.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "authContract.me.method": {
+    "kind": "value",
+    "value": "GET"
+  },
+  "authContract.me.path": {
+    "kind": "value",
+    "value": "/api/v1/auth/me"
+  },
+  "authContract.me.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            },
+            "displayName": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "email": {
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "email",
+            "displayName",
+            "createdAt"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.me.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "authContract.refresh.body": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "authContract.refresh.method": {
+    "kind": "value",
+    "value": "POST"
+  },
+  "authContract.refresh.path": {
+    "kind": "value",
+    "value": "/api/v1/auth/refresh"
+  },
+  "authContract.refresh.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.refresh.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "authContract.register.body": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "displayName": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "email": {
+          "format": "email",
+          "maxLength": 254,
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 200,
+          "minLength": 12,
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "password",
+        "displayName"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.register.method": {
+    "kind": "value",
+    "value": "POST"
+  },
+  "authContract.register.path": {
+    "kind": "value",
+    "value": "/api/v1/auth/register"
+  },
+  "authContract.register.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            },
+            "displayName": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "email": {
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "email",
+            "displayName",
+            "createdAt"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.register.status": {
+    "kind": "value",
+    "value": 201
+  },
+  "authContract.revokeSession.method": {
+    "kind": "value",
+    "value": "DELETE"
+  },
+  "authContract.revokeSession.path": {
+    "kind": "value",
+    "value": "/api/v1/auth/sessions/:id"
+  },
+  "authContract.revokeSession.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    }
+  },
+  "authContract.revokeSession.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "budgetSnapshot": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "exceeded": {
+          "type": "boolean"
+        },
+        "limitMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "reservedMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "resetAt": {
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "type": "string"
+        },
+        "spentMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "spentMicroUsd",
+        "reservedMicroUsd",
+        "limitMicroUsd",
+        "resetAt",
+        "exceeded"
+      ],
+      "type": "object"
+    }
+  },
+  "chartSpec": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "type": "array"
+        },
+        "series": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "label": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "label"
+            ],
+            "type": "object"
+          },
+          "maxItems": 6,
+          "minItems": 1,
+          "type": "array"
+        },
+        "title": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "bar",
+            "line"
+          ],
+          "type": "string"
+        },
+        "xKey": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "xKey",
+        "series",
+        "data"
+      ],
+      "type": "object"
+    }
+  },
+  "claim": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "rowIndex": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "toolCallId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "value": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "value",
+        "toolCallId",
+        "rowIndex",
+        "column"
+      ],
+      "type": "object"
+    }
+  },
+  "conversationResponse": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "conversation": {
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "updatedAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "createdAt",
+            "updatedAt"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "conversation"
+      ],
+      "type": "object"
+    }
+  },
+  "conversationView": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAt": {
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "createdAt",
+        "updatedAt"
+      ],
+      "type": "object"
+    }
+  },
+  "conversationsContract.create.body": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "conversationsContract.create.method": {
+    "kind": "value",
+    "value": "POST"
+  },
+  "conversationsContract.create.path": {
+    "kind": "value",
+    "value": "/api/v1/conversations"
+  },
+  "conversationsContract.create.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "conversation": {
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "updatedAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "createdAt",
+            "updatedAt"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "conversation"
+      ],
+      "type": "object"
+    }
+  },
+  "conversationsContract.create.status": {
+    "kind": "value",
+    "value": 201
+  },
+  "conversationsContract.get.method": {
+    "kind": "value",
+    "value": "GET"
+  },
+  "conversationsContract.get.path": {
+    "kind": "value",
+    "value": "/api/v1/conversations/:id"
+  },
+  "conversationsContract.get.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "conversation": {
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "updatedAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "createdAt",
+            "updatedAt"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "conversation"
+      ],
+      "type": "object"
+    }
+  },
+  "conversationsContract.get.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "conversationsContract.list.method": {
+    "kind": "value",
+    "value": "GET"
+  },
+  "conversationsContract.list.path": {
+    "kind": "value",
+    "value": "/api/v1/conversations"
+  },
+  "conversationsContract.list.query": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "cursor": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "conversationsContract.list.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "createdAt": {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "type": "string"
+              },
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "updatedAt": {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "createdAt",
+              "updatedAt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "type": "object"
+    }
+  },
+  "conversationsContract.list.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "conversationsContract.listMessages.method": {
+    "kind": "value",
+    "value": "GET"
+  },
+  "conversationsContract.listMessages.path": {
+    "kind": "value",
+    "value": "/api/v1/conversations/:id/messages"
+  },
+  "conversationsContract.listMessages.query": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "cursor": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 100,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "conversationsContract.listMessages.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "conversationId": {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "type": "string"
+              },
+              "createdAt": {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "type": "string"
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "message": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "type": "string"
+              },
+              "parts": {
+                "items": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "text",
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "text"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "tool_call",
+                          "type": "string"
+                        },
+                        "sql": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id",
+                        "sql"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "elapsedMs": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "kind": {
+                          "const": "tool_result",
+                          "type": "string"
+                        },
+                        "preview": {
+                          "items": {
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "maxItems": 20,
+                          "type": "array"
+                        },
+                        "rowCount": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "toolCallId": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "toolCallId",
+                        "rowCount",
+                        "preview",
+                        "elapsedMs",
+                        "error"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              "role": {
+                "enum": [
+                  "user",
+                  "assistant"
+                ],
+                "type": "string"
+              },
+              "seq": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "enum": [
+                  "generating",
+                  "complete",
+                  "stopped",
+                  "error"
+                ],
+                "type": "string"
+              },
+              "usage": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cachedInputTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "costMicroUsd": {
+                        "pattern": "^-?\\d+$",
+                        "type": "string"
+                      },
+                      "inputTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "outputTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "inputTokens",
+                      "outputTokens",
+                      "cachedInputTokens",
+                      "costMicroUsd"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "verification": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "checkedClaims": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "column": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "rowIndex": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "text": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "toolCallId": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "value": {
+                              "pattern": "^-?\\d+$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "value",
+                            "toolCallId",
+                            "rowIndex",
+                            "column"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "verdict": {
+                        "enum": [
+                          "pass",
+                          "fail"
+                        ],
+                        "type": "string"
+                      },
+                      "violations": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "reason": {
+                              "enum": [
+                                "no_evidence",
+                                "value_mismatch",
+                                "unit_mismatch",
+                                "out_of_coverage"
+                              ],
+                              "type": "string"
+                            },
+                            "text": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "reason"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "verdict",
+                      "checkedClaims",
+                      "violations"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "conversationId",
+              "seq",
+              "role",
+              "status",
+              "parts",
+              "verification",
+              "usage",
+              "error",
+              "createdAt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "type": "object"
+    }
+  },
+  "conversationsContract.listMessages.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "conversationsContract.remove.method": {
+    "kind": "value",
+    "value": "DELETE"
+  },
+  "conversationsContract.remove.path": {
+    "kind": "value",
+    "value": "/api/v1/conversations/:id"
+  },
+  "conversationsContract.remove.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    }
+  },
+  "conversationsContract.remove.status": {
+    "kind": "value",
+    "value": 202
+  },
+  "cursor": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "maxLength": 512,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "groundingReport": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "checkedClaims": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "column": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "rowIndex": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "text": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "toolCallId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "value": {
+                "pattern": "^-?\\d+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "value",
+              "toolCallId",
+              "rowIndex",
+              "column"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "violations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "reason": {
+                "enum": [
+                  "no_evidence",
+                  "value_mismatch",
+                  "unit_mismatch",
+                  "out_of_coverage"
+                ],
+                "type": "string"
+              },
+              "text": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "verdict",
+        "checkedClaims",
+        "violations"
+      ],
+      "type": "object"
+    }
+  },
+  "isTerminalStreamEvent": {
+    "kind": "function"
+  },
+  "isoDateTime": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+      "type": "string"
+    }
+  },
+  "listConversationsQuery": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "cursor": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "listMessagesQuery": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "cursor": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 100,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "loginBody": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "email": {
+          "format": "email",
+          "maxLength": 254,
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 200,
+          "minLength": 12,
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "password"
+      ],
+      "type": "object"
+    }
+  },
+  "messageIdentity": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ],
+          "type": "string"
+        },
+        "seq": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "conversationId",
+        "seq",
+        "role"
+      ],
+      "type": "object"
+    }
+  },
+  "messagePart": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "text",
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "kind": {
+              "const": "tool_call",
+              "type": "string"
+            },
+            "sql": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "sql"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "elapsedMs": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "const": "tool_result",
+              "type": "string"
+            },
+            "preview": {
+              "items": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            "rowCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "toolCallId": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "toolCallId",
+            "rowCount",
+            "preview",
+            "elapsedMs",
+            "error"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "messageRole": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "enum": [
+        "user",
+        "assistant"
+      ],
+      "type": "string"
+    }
+  },
+  "messageStatus": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "enum": [
+        "generating",
+        "complete",
+        "stopped",
+        "error"
+      ],
+      "type": "string"
+    }
+  },
+  "messageView": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "message": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "parts": {
+          "items": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "text",
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "text"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "tool_call",
+                    "type": "string"
+                  },
+                  "sql": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "sql"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "elapsedMs": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "error": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "const": "tool_result",
+                    "type": "string"
+                  },
+                  "preview": {
+                    "items": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "rowCount": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "toolCallId": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "toolCallId",
+                  "rowCount",
+                  "preview",
+                  "elapsedMs",
+                  "error"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ],
+          "type": "string"
+        },
+        "seq": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "generating",
+            "complete",
+            "stopped",
+            "error"
+          ],
+          "type": "string"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "cachedInputTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "costMicroUsd": {
+                  "pattern": "^-?\\d+$",
+                  "type": "string"
+                },
+                "inputTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "outputTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "inputTokens",
+                "outputTokens",
+                "cachedInputTokens",
+                "costMicroUsd"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verification": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "checkedClaims": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "column": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "rowIndex": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "text": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "toolCallId": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "value": {
+                        "pattern": "^-?\\d+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "value",
+                      "toolCallId",
+                      "rowIndex",
+                      "column"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "verdict": {
+                  "enum": [
+                    "pass",
+                    "fail"
+                  ],
+                  "type": "string"
+                },
+                "violations": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "reason": {
+                        "enum": [
+                          "no_evidence",
+                          "value_mismatch",
+                          "unit_mismatch",
+                          "out_of_coverage"
+                        ],
+                        "type": "string"
+                      },
+                      "text": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "reason"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "verdict",
+                "checkedClaims",
+                "violations"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "conversationId",
+        "seq",
+        "role",
+        "status",
+        "parts",
+        "verification",
+        "usage",
+        "error",
+        "createdAt"
+      ],
+      "type": "object"
+    }
+  },
+  "messagesContract.startGeneration.body": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "clientMessageId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "content": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "clientMessageId"
+      ],
+      "type": "object"
+    }
+  },
+  "messagesContract.startGeneration.method": {
+    "kind": "value",
+    "value": "POST"
+  },
+  "messagesContract.startGeneration.path": {
+    "kind": "value",
+    "value": "/api/v1/conversations/:id/messages"
+  },
+  "messagesContract.startGeneration.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "assistantMessageId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "resumed": {
+          "type": "boolean"
+        },
+        "streamPath": {
+          "pattern": "^\\/api\\/v1\\/.*",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assistantMessageId",
+        "streamPath",
+        "resumed"
+      ],
+      "type": "object"
+    }
+  },
+  "messagesContract.startGeneration.status": {
+    "kind": "value",
+    "value": 202
+  },
+  "messagesContract.stop.body": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "messagesContract.stop.method": {
+    "kind": "value",
+    "value": "POST"
+  },
+  "messagesContract.stop.path": {
+    "kind": "value",
+    "value": "/api/v1/messages/:id/stop"
+  },
+  "messagesContract.stop.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    }
+  },
+  "messagesContract.stop.status": {
+    "kind": "value",
+    "value": 202
+  },
+  "messagesContract.stream.method": {
+    "kind": "value",
+    "value": "GET"
+  },
+  "messagesContract.stream.path": {
+    "kind": "value",
+    "value": "/api/v1/messages/:id/stream"
+  },
+  "messagesContract.stream.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "microUsd": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "pattern": "^-?\\d+$",
+      "type": "string"
+    }
+  },
+  "ok": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    }
+  },
+  "page": {
+    "kind": "function"
+  },
+  "paginationQuery": {
+    "kind": "function"
+  },
+  "parseStreamEvent": {
+    "kind": "function"
+  },
+  "registerBody": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "displayName": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "email": {
+          "format": "email",
+          "maxLength": 254,
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 200,
+          "minLength": 12,
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "password",
+        "displayName"
+      ],
+      "type": "object"
+    }
+  },
+  "remainingMicroUsd": {
+    "kind": "function"
+  },
+  "sessionView": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "type": "boolean"
+        },
+        "device": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "ipHash": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "lastUsedAt": {
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "device",
+        "ipHash",
+        "lastUsedAt",
+        "current"
+      ],
+      "type": "object"
+    }
+  },
+  "startGenerationBody": {
+    "kind": "schema",
+    "role": "request",
+    "schema": {
+      "properties": {
+        "clientMessageId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "content": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "clientMessageId"
+      ],
+      "type": "object"
+    }
+  },
+  "startGenerationResponse": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "assistantMessageId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        },
+        "resumed": {
+          "type": "boolean"
+        },
+        "streamPath": {
+          "pattern": "^\\/api\\/v1\\/.*",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assistantMessageId",
+        "streamPath",
+        "resumed"
+      ],
+      "type": "object"
+    }
+  },
+  "streamEvent": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "assistantMessageId": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": {
+              "const": "generation_started",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "assistantMessageId",
+            "model"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "delta": {
+              "type": "string"
+            },
+            "type": {
+              "const": "text_delta",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "delta"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "argsDelta": {
+              "type": "string"
+            },
+            "index": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "tool_call_delta",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "index",
+            "argsDelta"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "sql": {
+              "type": "string"
+            },
+            "type": {
+              "const": "tool_call_ready",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "sql"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "elapsedMs": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "preview": {
+              "items": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            "rowCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "toolCallId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": {
+              "const": "tool_result",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "toolCallId",
+            "rowCount",
+            "preview",
+            "elapsedMs",
+            "error"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "attempt": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "reason": {
+              "enum": [
+                "unverifiable_claim",
+                "tool_error"
+              ],
+              "type": "string"
+            },
+            "type": {
+              "const": "draft_reset",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "attempt",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "report": {
+              "additionalProperties": false,
+              "properties": {
+                "checkedClaims": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "column": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "rowIndex": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "text": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "toolCallId": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "value": {
+                        "pattern": "^-?\\d+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "value",
+                      "toolCallId",
+                      "rowIndex",
+                      "column"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "verdict": {
+                  "enum": [
+                    "pass",
+                    "fail"
+                  ],
+                  "type": "string"
+                },
+                "violations": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "reason": {
+                        "enum": [
+                          "no_evidence",
+                          "value_mismatch",
+                          "unit_mismatch",
+                          "out_of_coverage"
+                        ],
+                        "type": "string"
+                      },
+                      "text": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "reason"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "verdict",
+                "checkedClaims",
+                "violations"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "verification",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "report"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "budget": {
+              "additionalProperties": false,
+              "properties": {
+                "exceeded": {
+                  "type": "boolean"
+                },
+                "limitMicroUsd": {
+                  "pattern": "^-?\\d+$",
+                  "type": "string"
+                },
+                "reservedMicroUsd": {
+                  "pattern": "^-?\\d+$",
+                  "type": "string"
+                },
+                "resetAt": {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                  "type": "string"
+                },
+                "spentMicroUsd": {
+                  "pattern": "^-?\\d+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "spentMicroUsd",
+                "reservedMicroUsd",
+                "limitMicroUsd",
+                "resetAt",
+                "exceeded"
+              ],
+              "type": "object"
+            },
+            "costMicroUsd": {
+              "pattern": "^-?\\d+$",
+              "type": "string"
+            },
+            "inputTokens": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "outputTokens": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "usage",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "inputTokens",
+            "outputTokens",
+            "costMicroUsd",
+            "budget"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "reconnect_hint",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "message": {
+              "additionalProperties": false,
+              "properties": {
+                "conversationId": {
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                  "type": "string"
+                },
+                "createdAt": {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                  "type": "string"
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "message": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                  "type": "string"
+                },
+                "parts": {
+                  "items": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "text",
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "text"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "tool_call",
+                            "type": "string"
+                          },
+                          "sql": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "sql"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "elapsedMs": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "error": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "kind": {
+                            "const": "tool_result",
+                            "type": "string"
+                          },
+                          "preview": {
+                            "items": {
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "maxItems": 20,
+                            "type": "array"
+                          },
+                          "rowCount": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "toolCallId": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "toolCallId",
+                          "rowCount",
+                          "preview",
+                          "elapsedMs",
+                          "error"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "role": {
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "type": "string"
+                },
+                "seq": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "status": {
+                  "enum": [
+                    "generating",
+                    "complete",
+                    "stopped",
+                    "error"
+                  ],
+                  "type": "string"
+                },
+                "usage": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "cachedInputTokens": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "costMicroUsd": {
+                          "pattern": "^-?\\d+$",
+                          "type": "string"
+                        },
+                        "inputTokens": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "outputTokens": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "inputTokens",
+                        "outputTokens",
+                        "cachedInputTokens",
+                        "costMicroUsd"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "verification": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "checkedClaims": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "column": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "rowIndex": {
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "text": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "toolCallId": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "value": {
+                                "pattern": "^-?\\d+$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "value",
+                              "toolCallId",
+                              "rowIndex",
+                              "column"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "verdict": {
+                          "enum": [
+                            "pass",
+                            "fail"
+                          ],
+                          "type": "string"
+                        },
+                        "violations": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "reason": {
+                                "enum": [
+                                  "no_evidence",
+                                  "value_mismatch",
+                                  "unit_mismatch",
+                                  "out_of_coverage"
+                                ],
+                                "type": "string"
+                              },
+                              "text": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "reason"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "verdict",
+                        "checkedClaims",
+                        "violations"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "conversationId",
+                "seq",
+                "role",
+                "status",
+                "parts",
+                "verification",
+                "usage",
+                "error",
+                "createdAt"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "message_complete",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "message": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": {
+              "const": "error",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "code",
+            "message"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "toolResultRow": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    }
+  },
+  "usageContract.get.method": {
+    "kind": "value",
+    "value": "GET"
+  },
+  "usageContract.get.path": {
+    "kind": "value",
+    "value": "/api/v1/usage"
+  },
+  "usageContract.get.response": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "exceeded": {
+          "type": "boolean"
+        },
+        "limitMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "remainingMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "reservedMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "resetAt": {
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "type": "string"
+        },
+        "spentMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "spentMicroUsd",
+        "reservedMicroUsd",
+        "limitMicroUsd",
+        "resetAt",
+        "exceeded",
+        "remainingMicroUsd"
+      ],
+      "type": "object"
+    }
+  },
+  "usageContract.get.status": {
+    "kind": "value",
+    "value": 200
+  },
+  "usageFacts": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "cachedInputTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "costMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "inputTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outputTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "inputTokens",
+        "outputTokens",
+        "cachedInputTokens",
+        "costMicroUsd"
+      ],
+      "type": "object"
+    }
+  },
+  "usageView": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "exceeded": {
+          "type": "boolean"
+        },
+        "limitMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "remainingMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "reservedMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        },
+        "resetAt": {
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "type": "string"
+        },
+        "spentMicroUsd": {
+          "pattern": "^-?\\d+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "spentMicroUsd",
+        "reservedMicroUsd",
+        "limitMicroUsd",
+        "resetAt",
+        "exceeded",
+        "remainingMicroUsd"
+      ],
+      "type": "object"
+    }
+  },
+  "userResponse": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            },
+            "displayName": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "email": {
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "email",
+            "displayName",
+            "createdAt"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "type": "object"
+    }
+  },
+  "userView": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAt": {
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "type": "string"
+        },
+        "displayName": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "email": {
+          "format": "email",
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName",
+        "createdAt"
+      ],
+      "type": "object"
+    }
+  },
+  "uuid": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+      "type": "string"
+    }
+  },
+  "violation": {
+    "kind": "schema",
+    "role": "response",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "enum": [
+            "no_evidence",
+            "value_mismatch",
+            "unit_mismatch",
+            "out_of_coverage"
+          ],
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "reason"
+      ],
+      "type": "object"
+    }
+  }
+}

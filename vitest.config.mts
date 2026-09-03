@@ -86,7 +86,7 @@ export default defineConfig({
       },
       {
         test: {
-          name: 'architecture',
+          name: 'tools',
           root: './tools',
           environment: 'node',
           include: ['**/*.spec.ts'],

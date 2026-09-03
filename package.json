@@ -30,6 +30,7 @@
     "check": "pnpm build && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
     "test:integration": "vitest run --project integration",
     "eval": "vitest run --project eval --reporter=verbose",
+    "contracts:snapshot": "CONTRACTS_SNAPSHOT=write vitest run --project tools contract-surface",
     "db:migrate": "pnpm --filter @fca/api db:migrate",
     "db:generate": "pnpm --filter @fca/api db:generate"
   },
@@ -51,6 +52,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "^8.68.0",
     "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "zod": "^4.4.3"
   }
 }
