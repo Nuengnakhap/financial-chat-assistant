@@ -96,6 +96,15 @@ export class RedisService implements OnModuleDestroy, HealthIndicator {
   }
 
   /**
+   * Every field of a hash, or an empty one for a key that is not there. Reading
+   * the whole thing is the cheaper call here: the alternative is one `HGET` per
+   * field, and these hashes hold a handful of fields by design.
+   */
+  async readHash(key: RedisKey): Promise<Readonly<Record<string, string>>> {
+    return await this.client.hgetall(key);
+  }
+
+  /**
    * One round trip for both, because this runs once per token: a stream that
    * outlived its window is worse than one trimmed a little early, and a second
    * call to set the expiry would double the cost of every delta.
