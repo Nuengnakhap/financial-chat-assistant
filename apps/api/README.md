@@ -86,7 +86,9 @@ unhandled `'error'` on an `EventEmitter` ends the process. Measured, not
 reasoned about — `pnpm drill postgres` stopped the database under a running API
 and killed it. With the listener, readiness goes red, the relay and the janitors
 log and carry on, and the same process is serving again when the database comes
-back.
+back. That drill now polls `/healthz/live` every half-second for as long as the
+database is down and requires every answer, which is the difference between a
+dependency being unavailable and this process being gone.
 
 **A change and the news of it are one transaction.** Anything that alters state
 and has to reach somewhere else goes through `UnitOfWork`: repositories and an

@@ -55,10 +55,43 @@ async function until(want, seconds) {
   return false;
 }
 
-async function counters() {
-  const response = await fetch(`${API}/healthz/counters`);
+/** What this process has counted, or why it could not be read. */
+async function counted() {
+  try {
+    const response = await fetch(`${API}/healthz/counters`);
 
-  return response.ok ? await response.json() : {};
+    return response.ok ? await response.text() : `unavailable (${String(response.status)})`;
+  } catch {
+    return 'unavailable — nothing is listening';
+  }
+}
+
+/** Liveness: the process is running at all. Touches no dependency, by design. */
+async function live() {
+  try {
+    return (await fetch(`${API}/healthz/live`)).ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Liveness held all the way through the outage.
+ *
+ * This is the check that matters most and it is the one that was missing: an
+ * unhandled `'error'` on a `pg.Pool` **ends the Node process**, so before that
+ * listener existed, stopping Postgres here did not make readiness go red — it
+ * killed the API. Answering `/healthz/live` throughout is the difference
+ * between a dependency being down and this process being gone, and unlike a
+ * comparison of counters it can be made every time.
+ */
+async function stayedAlive(seconds) {
+  for (let checked = 0; checked < seconds * 2; checked += 1) {
+    if (!(await live())) return false;
+    await sleep(500);
+  }
+
+  return true;
 }
 
 /**
@@ -72,6 +105,8 @@ async function drillRedis() {
 
   compose('stop', 'redis');
   check('readiness turns red within 15s', await until(false, 15));
+
+  check('liveness never wavers while it is down', await stayedAlive(3));
 
   compose('start', 'redis');
   check('readiness turns green again within 30s', await until(true, 30));
@@ -88,10 +123,11 @@ async function drillRedis() {
 async function drillPostgres() {
   console.log('Postgres — stopped and started under a running API\n');
   check('the API is ready to begin with', await ready());
-  const before = await counters();
 
   compose('stop', 'postgres');
   check('readiness turns red within 15s', await until(false, 15));
+  // The one this drill exists for: see `stayedAlive`.
+  check('the process is still alive with no database at all', await stayedAlive(4));
 
   compose('start', 'postgres');
   check('readiness turns green again within 60s', await until(true, 60));
@@ -100,15 +136,12 @@ async function drillPostgres() {
   // just cut off, so green here is a real round trip on a reconnected pool and
   // not a cached answer.
   await sleep(3_000);
-  const after = await counters();
-  // The relay and the janitors log and carry on rather than stopping after one
-  // bad second, so what survives an outage is the process itself — and these
-  // numbers are in it, so they are the proof it was never restarted.
-  check(
-    'and the process was never restarted, so its counts are still there',
-    Object.keys(after).length >= Object.keys(before).length,
-    `${JSON.stringify(before)} → ${JSON.stringify(after)}`,
-  );
+  check('and answers on a reconnected pool without being restarted', await ready());
+  // Printed, not checked: these are all failure counters, so a healthy process
+  // reports `{}` and comparing two of those would prove nothing. Guarded like
+  // every other request here — a drill that throws on a dead API reports a
+  // stack trace where it should be reporting the failure it just found.
+  console.log(`  ---   counted so far: ${await counted()}`);
 }
 
 const which = process.argv[2];
