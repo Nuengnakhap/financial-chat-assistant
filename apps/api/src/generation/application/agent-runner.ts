@@ -1,3 +1,4 @@
+import { GENERATION_LIMITS } from '@fca/config';
 import type { GroundingReport } from '@fca/contracts';
 import {
   INITIAL_GENERATION_PHASE,
@@ -38,12 +39,16 @@ import { Transcript } from './transcript';
  */
 
 /**
- * Five rounds of asking the database inside one draft. Measured against the real
+ * Rounds of asking the database inside one draft. Measured against the real
  * model: an ordinary question takes one, a question whose first query is refused
  * takes two, and one where the model reads its own result and disagrees with it
  * takes three. Five leaves room; a sixth has never been the round that answered.
+ *
+ * It comes from `@fca/config` rather than from here because the budget prices
+ * the worst this loop can do, and a ceiling the two disagreed about would be a
+ * reservation that stops covering the thing it is meant to cover.
  */
-const MAX_TOOL_ROUNDS = 5;
+const MAX_TOOL_ROUNDS = GENERATION_LIMITS.maxToolRounds;
 
 /**
  * Wording chosen from a code rather than passed up from wherever it broke — the
