@@ -65,6 +65,23 @@ describe('the application', () => {
     expect(await screen.findByRole('button', { name: 'Sign in' })).toBeInTheDocument();
   });
 
+  it('leaves somebody on the sign-up screen where they are', async () => {
+    // The opening `/auth/me` of a first visit is refused, and so is the refresh
+    // behind it — so this fires for somebody who has never had a session. It
+    // used to send them to sign in, on the page whose whole purpose is that
+    // they do not have an account yet. Found in a real browser, because no test
+    // here had ever arrived at `/register` from cold.
+    stubApi(() => signedOut());
+    renderApp(<AppScreens />, '/register');
+    expect(await screen.findByRole('button', { name: 'Create account' })).toBeInTheDocument();
+
+    act(() => {
+      announceSessionExpired();
+    });
+
+    expect(await screen.findByRole('button', { name: 'Create account' })).toBeInTheDocument();
+  });
+
   it('empties the cache of the previous person when the session expires', async () => {
     // Three things end a session — signing out, revoking the one you hold, and a
     // refused refresh — and all three have to leave the same nothing behind.
