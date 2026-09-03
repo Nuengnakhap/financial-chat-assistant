@@ -1,4 +1,9 @@
-import { authContract, conversationsContract, messagesContract } from '@fca/contracts';
+import {
+  authContract,
+  conversationsContract,
+  messagesContract,
+  usageContract,
+} from '@fca/contracts';
 import type { z } from 'zod';
 
 import { apiFetch } from './http';
@@ -160,4 +165,5 @@ export const api = createClient({
   auth: authContract,
   conversations: conversationsContract,
   messages: { startGeneration: messagesContract.startGeneration, stop: messagesContract.stop },
+  usage: usageContract,
 });

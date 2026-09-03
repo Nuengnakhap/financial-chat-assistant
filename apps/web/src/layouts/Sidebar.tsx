@@ -4,12 +4,17 @@ import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { useSession, useSignOut } from '@/domains/auth';
 import { ConversationList, useCreateConversation } from '@/domains/conversation';
+import { UsageMeter } from '@/domains/usage';
 import { messageFor } from '@/lib/api/errors';
 import { cx } from '@/utils/cx';
 
 /**
  * The rail beside the conversation: what you can start, what you have already
- * asked, and who you are.
+ * asked, who you are, and what asking has cost you.
+ *
+ * The meter is here rather than in the bar above because a budget belongs to a
+ * person, and this is where the person is. The bar is on the sign-in screen
+ * too, where there is nobody to have spent anything.
  */
 export function Sidebar() {
   const session = useSession();
@@ -26,6 +31,7 @@ export function Sidebar() {
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
         <p className="truncate text-body-sm">{name}</p>
+        <UsageMeter />
         <NavLink
           to="/sessions"
           className={({ isActive }) =>

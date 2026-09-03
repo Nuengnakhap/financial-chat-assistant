@@ -244,17 +244,27 @@
 }
 
 /* ─── motion ──────────────────────────────────────────────────────────────
-   One animation, declared here for the same reason every colour is: a value
-   invented at a call site is a decision nobody can find again. It steps rather
-   than fading, because a caret that fades is a caret that looks like it is
-   still drawing. The reduced-motion block above stops it without this file
-   having to say so twice. */
+   Two animations, declared here for the same reason every colour is: a value
+   invented at a call site is a decision nobody can find again. The caret steps
+   rather than fading, because a caret that fades is a caret that looks like it
+   is still drawing. The banner arrives from above rather than appearing,
+   because something that appears at the top of a page reads as a page that
+   moved. The reduced-motion block above stops both without this file having to
+   say so twice. */
 @theme {
   --animate-caret: caret 1s steps(2, start) infinite;
+  --animate-slide-down: slide-down 200ms ease-out;
 }
 
 @keyframes caret {
   to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateY(-100%);
     opacity: 0;
   }
 }

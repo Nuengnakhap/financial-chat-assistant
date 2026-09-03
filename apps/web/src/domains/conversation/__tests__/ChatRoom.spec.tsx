@@ -15,6 +15,7 @@ import {
   renderApp,
   stubApi,
 } from '@/__tests__/harness';
+import { UsageMeter } from '@/domains/usage';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -94,8 +95,11 @@ describe('reading a conversation', () => {
     renderApp(<ChatRoom conversationId={ID} />);
     await screen.findByText('first thing');
 
-    expect(calls[0]).toContain(`/conversations/${ID}/messages?limit=100`);
-    expect(calls[0]).not.toContain('cursor');
+    // The first read of the history, whatever else the screen asks for: the
+    // page with no cursor is what "start at the end" means.
+    const history = calls.find((call) => call.includes('/messages?limit'));
+    expect(history).toContain(`/conversations/${ID}/messages?limit=100`);
+    expect(history).not.toContain('cursor');
   });
 });
 
@@ -574,6 +578,127 @@ describe('an answer that was already being written', () => {
     // Effects run twice in development, and a second attach would read the same
     // stream from the beginning beside the first — every event dispatched twice.
     expect(calls.filter((call) => call.includes('/stream'))).toHaveLength(1);
+  });
+});
+
+describe('a window that has been spent', () => {
+  const spentWindow = {
+    spentMicroUsd: '1000000',
+    reservedMicroUsd: '0',
+    limitMicroUsd: '1000000',
+    remainingMicroUsd: '0',
+    resetAt: '2026-09-02T15:00:00.000Z',
+    exceeded: true,
+  };
+
+  it('shuts the composer rather than letting a question be typed and refused', async () => {
+    stubApi((url) => (url.includes('/usage') ? json(spentWindow) : page([])));
+
+    renderApp(<ChatRoom conversationId={ID} />);
+
+    // The server would refuse it anyway. Being refused after typing a question
+    // is a worse way to find out than being told before typing one.
+    const box = await screen.findByLabelText('Ask a question');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    });
+    expect(box).toHaveAttribute('placeholder', expect.stringContaining('until the limit resets'));
+    // Read-only rather than disabled: a window can run out while somebody is
+    // halfway through the next question, and disabling the box then takes the
+    // caret away mid-sentence and their words with it.
+    expect(box).toHaveAttribute('readonly');
+    expect(box).not.toBeDisabled();
+  });
+
+  it('refuses the send for a question already typed when the window ran out', async () => {
+    // The order somebody actually meets this in: they are halfway through the
+    // next question when the last answer finishes and the window closes. The
+    // words stay; the send does not go.
+    let spent = false;
+    const { calls } = stubApi((url, init) => {
+      if (url.includes('/usage')) {
+        return json(
+          spent
+            ? spentWindow
+            : { ...spentWindow, spentMicroUsd: '0', remainingMicroUsd: '1000000', exceeded: false },
+        );
+      }
+      if (init?.method === 'POST') return json({}, 500);
+
+      return page([]);
+    });
+
+    const { queryClient } = renderApp(<ChatRoom conversationId={ID} />);
+    await screen.findByText(/Ask the first question/);
+    await userEvent.type(screen.getByLabelText('Ask a question'), 'and what about Microsoft');
+
+    spent = true;
+    await queryClient.invalidateQueries({ queryKey: ['usage'] });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    });
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('and what about Microsoft');
+    expect(calls.filter((call) => call.startsWith('POST'))).toEqual([]);
+  });
+
+  it('moves the meter from what the stream said, without asking again', async () => {
+    const { calls } = stubApi((url, init) => {
+      if (url.includes('/usage')) {
+        return json({
+          ...spentWindow,
+          spentMicroUsd: '0',
+          remainingMicroUsd: '1000000',
+          exceeded: false,
+        });
+      }
+      if (url.includes('/stream')) {
+        return eventStream([
+          frame('1-0', {
+            type: 'usage',
+            inputTokens: 1_800,
+            outputTokens: 90,
+            costMicroUsd: '1890',
+            budget: {
+              spentMicroUsd: '420000',
+              reservedMicroUsd: '0',
+              limitMicroUsd: '1000000',
+              resetAt: '2026-09-02T15:00:00.000Z',
+              exceeded: false,
+            },
+          }),
+          frame('2-0', { type: 'message_complete', message: answered([]) }),
+        ]);
+      }
+      if (init?.method === 'POST') {
+        return json(
+          {
+            assistantMessageId: ANSWER,
+            streamPath: `/api/v1/messages/${ANSWER}/stream`,
+            resumed: false,
+          },
+          202,
+        );
+      }
+
+      return page([]);
+    });
+
+    renderApp(
+      <>
+        <ChatRoom conversationId={ID} />
+        <UsageMeter />
+      </>,
+    );
+    await screen.findByText(/Ask the first question/);
+    await userEvent.type(screen.getByLabelText('Ask a question'), 'hello');
+    const readsBefore = calls.filter((call) => call.includes('/usage')).length;
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    // The stream has just said what the window looks like. Asking the server
+    // the same question again would be a request for an answer already in hand.
+    expect(await screen.findByText('$0.42 / $1.00')).toBeInTheDocument();
+    expect(calls.filter((call) => call.includes('/usage'))).toHaveLength(readsBefore);
   });
 });
 

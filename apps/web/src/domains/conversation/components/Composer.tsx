@@ -20,15 +20,26 @@ const FALLBACK_LINE_PX = 24;
 
 export interface ComposerProps {
   readonly busy: boolean;
+  /**
+   * The window is spent. Said here rather than left to the server, because the
+   * refusal would arrive after the question was typed and sent — and the banner
+   * above already says why.
+   *
+   * It refuses the send and leaves the box alone, for the same reason `busy`
+   * does: a window can run out while somebody is halfway through typing the
+   * next question, and disabling the box then takes the caret away mid-sentence
+   * and their words with it.
+   */
+  readonly spent?: boolean;
   readonly onSend: (content: string) => void;
   /** Absent when there is nothing being written to stop. */
   readonly onStop?: (() => void) | undefined;
 }
 
-export function Composer({ busy, onSend, onStop }: ComposerProps) {
+export function Composer({ busy, spent = false, onSend, onStop }: ComposerProps) {
   const [text, setText] = useState('');
   const box = useGrowsWithText(text);
-  const ready = text.trim() !== '' && !busy;
+  const ready = text.trim() !== '' && !busy && !spent;
 
   const send = (): void => {
     if (!ready) return;
@@ -40,19 +51,7 @@ export function Composer({ busy, onSend, onStop }: ComposerProps) {
   return (
     <div className="w-full max-w-measure pt-8">
       <div className="flex items-end gap-3 border-t border-line-strong pt-3">
-        <textarea
-          ref={box}
-          rows={1}
-          value={text}
-          maxLength={MAX_LENGTH}
-          aria-label="Ask a question"
-          placeholder="Ask about revenue or net income"
-          onChange={(event) => {
-            setText(event.target.value);
-          }}
-          onKeyDown={keys({ send, onStop })}
-          className="min-w-0 flex-1 resize-none bg-surface text-body text-text placeholder:text-muted"
-        />
+        <Box box={box} text={text} spent={spent} onChange={setText} keys={keys({ send, onStop })} />
         {onStop === undefined ? (
           <Button variant="primary" size="sm" disabled={!ready} onClick={send}>
             Send
@@ -65,6 +64,36 @@ export function Composer({ busy, onSend, onStop }: ComposerProps) {
       </div>
       <Assurance />
     </div>
+  );
+}
+
+interface BoxProps {
+  readonly box: React.RefObject<HTMLTextAreaElement | null>;
+  readonly text: string;
+  readonly spent: boolean;
+  readonly onChange: (text: string) => void;
+  readonly keys: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+}
+
+/** Split out for length alone: the rules above it are what this file is about. */
+function Box({ box, text, spent, onChange, keys: onKeyDown }: BoxProps) {
+  return (
+    <textarea
+      ref={box}
+      rows={1}
+      value={text}
+      maxLength={MAX_LENGTH}
+      aria-label="Ask a question"
+      readOnly={spent}
+      placeholder={
+        spent ? 'Asking is paused until the limit resets' : 'Ask about revenue or net income'
+      }
+      onChange={(event) => {
+        onChange(event.target.value);
+      }}
+      onKeyDown={onKeyDown}
+      className="min-w-0 flex-1 resize-none bg-surface text-body text-text placeholder:text-muted"
+    />
   );
 }
 

@@ -1,10 +1,11 @@
-import { isTerminalStreamEvent, type StreamEvent } from '@fca/contracts';
+import { isTerminalStreamEvent, type BudgetSnapshot, type StreamEvent } from '@fca/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import { IDLE, generatingId, reduce, type GenerationState } from './generation.state';
 import { askQuestion, stopGenerating, streamPathFor, watchGeneration } from '../api/generation';
 
+import { useReadsUsageAgain, useRecordsWhatWasSpent } from '@/domains/usage';
 import { ApiError, messageFor } from '@/lib/api/errors';
 
 /**
@@ -50,6 +51,7 @@ export function useGeneration(conversationId: string): Generation {
     [refresh, attachment],
   );
 
+  const spent = useRecordsWhatWasSpent();
   const watching = useRef<string | null>(null);
   const watch = useCallback(
     async (assistantMessageId: string) => {
@@ -61,17 +63,18 @@ export function useGeneration(conversationId: string): Generation {
       watching.current = assistantMessageId;
       const signal = attachment.start();
       dispatch({ type: 'watch', assistantMessageId });
-      await follow({ path: streamPathFor(assistantMessageId), signal, dispatch, finish });
+      await follow({ path: streamPathFor(assistantMessageId), signal, dispatch, finish, spent });
     },
-    [finish, attachment],
+    [finish, attachment, spent],
   );
 
+  const readUsage = useReadsUsageAgain();
   const send = useCallback(
     (content: string) => {
       dispatch({ type: 'ask', question: content });
-      void ask(conversationId, content, { dispatch, watch });
+      void ask(conversationId, content, { dispatch, watch, readUsage });
     },
-    [conversationId, watch],
+    [conversationId, watch, readUsage],
   );
 
   const stop = useCallback(() => {
@@ -168,6 +171,7 @@ type Dispatch = (action: Parameters<typeof reduce>[1]) => void;
 interface Asking {
   readonly dispatch: Dispatch;
   readonly watch: (assistantMessageId: string) => Promise<void>;
+  readonly readUsage: () => void;
 }
 
 /**
@@ -187,6 +191,10 @@ async function ask(conversationId: string, content: string, asking: Asking): Pro
     });
     await asking.watch(started.assistantMessageId);
   } catch (error) {
+    // A refused question is the other thing that moves a meter, and the refusal
+    // itself cannot say by how much: the failure shape is a code, a sentence and
+    // a request id, deliberately. So the window is read again.
+    if (error instanceof ApiError && error.code === 'budget_exceeded') asking.readUsage();
     asking.dispatch({ type: 'failed', message: messageFor(error) });
   }
 }
@@ -211,6 +219,8 @@ interface Following {
   readonly signal: AbortSignal;
   readonly dispatch: Dispatch;
   readonly finish: (event: StreamEvent) => void;
+  /** Where the meter reads its figures from: the stream says them once, at the end. */
+  readonly spent: (budget: BudgetSnapshot) => void;
 }
 
 /**
@@ -260,6 +270,10 @@ async function readOnce(following: Following, from: string | null): Promise<Outc
   try {
     for await (const frame of watchGeneration(following.path, seen, following.signal)) {
       seen = frame.id ?? seen;
+      // Written where the meter reads rather than invalidated: the stream has
+      // just said what the window looks like, and asking the server the same
+      // question again would be a request for an answer already in hand.
+      if (frame.event.type === 'usage') following.spent(frame.event.budget);
       following.dispatch({ type: 'frame', frame });
       if (isTerminalStreamEvent(frame.event)) {
         following.finish(frame.event);

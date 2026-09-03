@@ -13,6 +13,7 @@ import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Skeleton } from '@/components/Skeleton';
+import { useUsage } from '@/domains/usage';
 import { ApiError, messageFor } from '@/lib/api/errors';
 
 /**
@@ -77,9 +78,14 @@ export function ChatRoom({ conversationId, opening }: ChatRoomProps) {
 }
 
 function Ask({ generation }: { readonly generation: Generation }) {
+  const usage = useUsage();
+
   return (
     <Composer
       busy={isBusy(generation)}
+      // Shut while the window is spent. The server would refuse it anyway, and
+      // being refused after typing a question is a worse way to find out.
+      spent={usage?.exceeded === true}
       onSend={generation.send}
       onStop={canStop(generation) ? generation.stop : undefined}
     />
