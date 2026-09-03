@@ -19,7 +19,7 @@ export function ChatPage() {
 
   return (
     <AppShell>
-      <div className="flex min-h-0 flex-1 flex-col justify-between px-24 py-16">
+      <div className="flex min-h-0 flex-1 flex-col justify-between px-6 py-16 md:px-12 lg:px-24">
         {id === undefined ? (
           <Welcome />
         ) : (
@@ -82,19 +82,21 @@ function Welcome() {
 
   return (
     <>
-      <div className="w-full max-w-measure">
-        <h1 className="text-display font-book tracking-tight">
+      <div className="mx-auto w-full max-w-room px-6">
+        <h1 className="max-w-measure text-display font-book tracking-tight">
           Ask about the revenue and income of U.S. public companies.
         </h1>
-        <p className="mt-4 text-muted">
+        <p className="mt-4 max-w-measure text-muted">
           Every figure in an answer comes from a query you can read, and is checked against that
           query&rsquo;s result before it reaches you.
         </p>
         <Examples disabled={asking} onPick={ask} />
       </div>
-      <p className="w-full max-w-measure border-t border-line-strong pt-3 font-mono text-micro tracking-wide text-muted uppercase">
-        Every figure is verified against the query result
-      </p>
+      <div className="mx-auto w-full max-w-room px-6">
+        <p className="border-t border-line-strong pt-3 font-mono text-micro tracking-wide text-muted uppercase">
+          Every figure is verified against the query result
+        </p>
+      </div>
     </>
   );
 }

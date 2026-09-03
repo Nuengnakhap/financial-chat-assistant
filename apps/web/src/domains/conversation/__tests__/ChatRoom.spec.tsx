@@ -192,6 +192,19 @@ describe('asking a question', () => {
     expect(await screen.findByText(/Working on it/)).toBeInTheDocument();
   });
 
+  it('wraps a question at the same width as the answer to it', async () => {
+    // The room is wider than a line of prose so a table can use it. A question
+    // left uncapped wrapped at 896px while the answer under it wrapped at 672,
+    // in the same conversation.
+    serve({ stream: () => eventStream([], true) });
+
+    await ask('What was the revenue of Apple in 2024?');
+
+    const question = await screen.findByText('What was the revenue of Apple in 2024?');
+
+    expect(question.className).toContain('max-w-measure');
+  });
+
   it('shows the query being written, then the rows it came back with', async () => {
     serve({
       stream: () =>

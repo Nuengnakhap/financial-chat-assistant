@@ -49,8 +49,13 @@ export function Composer({ busy, spent = false, onSend, onStop }: ComposerProps)
   };
 
   return (
-    <div className="w-full max-w-measure pt-8">
-      <div className="flex items-end gap-3 border-t border-line-strong pt-3">
+    <div className="mx-auto w-full max-w-room pt-8">
+      {/* The rule runs the width of the room and the fields sit inside its
+          gutters — the same gutters the transcript's scrollbar comes down. A
+          rule that stopped short of the scrollbar left it hanging past the end
+          of the line, which is what it looked like: a bar laid over the edge of
+          the composer rather than the edge of the conversation. */}
+      <div className="flex items-end gap-3 border-t border-line-strong px-6 pt-3">
         <Box box={box} text={text} spent={spent} onChange={setText} keys={keys({ send, onStop })} />
         {onStop === undefined ? (
           <Button variant="primary" size="sm" disabled={!ready} onClick={send}>

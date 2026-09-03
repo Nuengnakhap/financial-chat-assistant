@@ -159,6 +159,12 @@
   --container-rail: 256px; /* the list beside the conversation */
   --container-form: 384px; /* a column of fields */
   --container-measure: 672px; /* a line of prose at a length that stays readable */
+  /* The conversation itself, which is wider than a line of prose on purpose: an
+     answer is prose *and* a table of four columns *and* a chart of forty bars,
+     and holding all three to a reading measure left a third of a 1440px screen
+     empty while the table scrolled sideways inside it. Prose keeps the measure
+     — see the markdown overrides — and the figures get the rest. */
+  --container-room: 896px;
 
   /* ─── depth ─────────────────────────────────────────────────────────────
      Deliberately empty. Closing the scale with nothing in it removes every

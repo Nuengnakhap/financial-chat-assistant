@@ -135,3 +135,26 @@ describe('a chart of more than one thing', () => {
     expect(screen.getByRole('img', { name: /Revenue in 2023/ })).toBeInTheDocument();
   });
 });
+
+/**
+ * The room is wider than a line of prose, and this is where the two part
+ * company. Held to one width, a four-column table scrolled sideways while a
+ * third of a 1440px screen sat empty beside it; held to the other, a sentence
+ * ran nine hundred pixels and was tiring to read.
+ */
+describe('how wide a thing is allowed to be', () => {
+  it('holds a sentence to the reading measure', () => {
+    render(<Markdown text="Nvidia's revenue rose to $130.5B in 2025." />);
+
+    expect(screen.getByText(/Nvidia/).className).toContain('max-w-measure');
+  });
+
+  it('lets a table have the whole room', () => {
+    render(<Markdown text={'| Year | Revenue |\n|---|---:|\n| 2024 | $60.9B |'} />);
+
+    const table = screen.getByRole('table');
+
+    expect(table.className).not.toContain('max-w-measure');
+    expect(table.parentElement?.className).not.toContain('max-w-measure');
+  });
+});

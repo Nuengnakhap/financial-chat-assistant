@@ -21,15 +21,27 @@ import { ChartBlock } from './ChartBlock';
 
 const CHART = 'language-chart';
 
+/**
+ * Prose is held to the reading measure and the figures are not. A sentence that
+ * runs the width of the room is tiring to read; a table of four columns held to
+ * the width of a sentence scrolls sideways while a third of the screen sits
+ * empty beside it. Both were true here, and this is where the two part company.
+ */
+const PROSE = 'max-w-measure';
+
 const COMPONENTS: Components = {
-  p: ({ children }) => <p className="my-3 first:mt-0 last:mb-0">{children}</p>,
+  p: ({ children }) => <p className={`${PROSE} my-3 first:mt-0 last:mb-0`}>{children}</p>,
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-  ul: ({ children }) => <ul className="my-3 list-disc pl-4">{children}</ul>,
-  ol: ({ children }) => <ol className="my-3 list-decimal pl-4">{children}</ol>,
+  ul: ({ children }) => <ul className={`${PROSE} my-3 list-disc pl-4`}>{children}</ul>,
+  ol: ({ children }) => <ol className={`${PROSE} my-3 list-decimal pl-4`}>{children}</ol>,
   li: ({ children }) => <li className="my-1">{children}</li>,
-  h1: ({ children }) => <h3 className="mt-6 mb-2 text-heading-sm font-book">{children}</h3>,
-  h2: ({ children }) => <h3 className="mt-6 mb-2 text-heading-sm font-book">{children}</h3>,
-  h3: ({ children }) => <h4 className="mt-6 mb-2 font-medium">{children}</h4>,
+  h1: ({ children }) => (
+    <h3 className={`${PROSE} mt-6 mb-2 text-heading-sm font-book`}>{children}</h3>
+  ),
+  h2: ({ children }) => (
+    <h3 className={`${PROSE} mt-6 mb-2 text-heading-sm font-book`}>{children}</h3>
+  ),
+  h3: ({ children }) => <h4 className={`${PROSE} mt-6 mb-2 font-medium`}>{children}</h4>,
   a: ({ children, href }) => (
     <a className="underline underline-offset-2" href={href} rel="noreferrer noopener">
       {children}

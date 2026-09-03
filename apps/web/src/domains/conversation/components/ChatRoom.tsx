@@ -60,7 +60,15 @@ export function ChatRoom({ conversationId, opening }: ChatRoomProps) {
 
   return (
     <>
-      <div ref={scroll} className="min-h-0 w-full max-w-measure flex-1 overflow-y-auto">
+      <div
+        ref={scroll}
+        /* `pr-6` is not symmetry for its own sake: this is the element that
+           scrolls, so the scrollbar is drawn on its right edge — over the
+           content on a platform with overlay scrollbars. A figure whose last
+           column ends underneath the scrollbar reads as cut off. `pl-6` keeps
+           the text where the eye expects it, aligned with the composer below. */
+        className="mx-auto min-h-0 w-full max-w-room flex-1 overflow-y-auto px-6"
+      >
         {history.isPending && <Loading />}
         {history.isError && !gone && <Unreadable error={history.error} onRetry={retry} />}
         {history.isSuccess && (
@@ -183,7 +191,7 @@ function Asked({ question }: { readonly question: string }) {
 
   return (
     <Said role="user">
-      <p className="whitespace-pre-wrap">{question}</p>
+      <p className="max-w-measure whitespace-pre-wrap">{question}</p>
     </Said>
   );
 }
@@ -196,7 +204,7 @@ function Message({ message }: { readonly message: MessageView }) {
           something the row can prove. */}
       <ErrorBoundary label="This message">
         {message.role === 'user' ? (
-          <p className="whitespace-pre-wrap">{textOf(message)}</p>
+          <p className="max-w-measure whitespace-pre-wrap">{textOf(message)}</p>
         ) : (
           <Answer
             parts={message.parts}
