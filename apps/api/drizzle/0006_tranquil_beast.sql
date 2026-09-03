@@ -1,0 +1,2 @@
+ALTER TABLE "outbox_events" DROP CONSTRAINT "chk_outbox_type";--> statement-breakpoint
+ALTER TABLE "outbox_events" ADD CONSTRAINT "chk_outbox_type" CHECK ("outbox_events"."type" IN ('conversation.delete_requested', 'generation.requested', 'session.token_reuse_detected'));

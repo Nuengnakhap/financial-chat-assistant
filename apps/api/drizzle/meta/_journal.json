@@ -43,6 +43,13 @@
       "when": 1788363806023,
       "tag": "0005_bent_sage",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788412607863,
+      "tag": "0006_tranquil_beast",
+      "breakpoints": true
     }
   ]
 }

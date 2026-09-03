@@ -17,6 +17,9 @@ importers:
       '@fca/contracts':
         specifier: workspace:*
         version: link:packages/contracts
+      '@fca/domain':
+        specifier: workspace:*
+        version: link:packages/domain
       '@fca/grounding':
         specifier: workspace:*
         version: link:packages/grounding

@@ -49,7 +49,7 @@ describe('wiring the handlers', () => {
 
   it('accepts one for each type', () => {
     expect(() =>
-      workerWith([handlerFor('conversation.delete_requested'), handlerFor('message.appended')]),
+      workerWith([handlerFor('conversation.delete_requested'), handlerFor('generation.requested')]),
     ).not.toThrow();
   });
 });
@@ -62,7 +62,7 @@ describe('a domain event job', () => {
     // The wanted one is second on purpose: first in the list is what a
     // dispatch that ignores the type would reach for, and it would look right.
     await workerWith([
-      handlerFor('message.appended', other),
+      handlerFor('generation.requested', other),
       handlerFor('conversation.delete_requested', wanted),
     ]).run(jobOf(EVENT));
 
@@ -77,7 +77,7 @@ describe('a domain event job', () => {
     const unrelated = vi.fn();
 
     await expect(
-      workerWith([handlerFor('message.appended', unrelated)]).run(jobOf(EVENT)),
+      workerWith([handlerFor('generation.requested', unrelated)]).run(jobOf(EVENT)),
     ).resolves.toBe(undefined);
 
     // Finishing quietly is only right if nothing ran. Without this the test

@@ -3,9 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { DOMAIN_EVENT_TYPES, isDomainEventType } from '../events';
 
 describe('the event vocabulary', () => {
-  it('names every event a consumer may be handed', () => {
+  it('names every event a consumer may be handed, and nothing else', () => {
+    // Three, and each is the only record of what it describes or the one job
+    // that starts real work. Five names were removed at M11.3 after two
+    // milestones with no publisher — every one of them duplicating a row that
+    // already existed and outlived it. `tools/domain-events` is what keeps that
+    // true: it fails when a name here is published by nothing.
     expect(DOMAIN_EVENT_TYPES).toContain('generation.requested');
-    expect(DOMAIN_EVENT_TYPES).toContain('usage.recorded');
+    expect(DOMAIN_EVENT_TYPES).toContain('conversation.delete_requested');
+    expect(DOMAIN_EVENT_TYPES).toContain('session.token_reuse_detected');
+    expect(DOMAIN_EVENT_TYPES).toHaveLength(3);
     expect(new Set(DOMAIN_EVENT_TYPES).size).toBe(DOMAIN_EVENT_TYPES.length);
   });
 

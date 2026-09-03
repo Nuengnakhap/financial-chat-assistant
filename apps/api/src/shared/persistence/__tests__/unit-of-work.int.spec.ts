@@ -36,7 +36,7 @@ const created = (id: ConversationId) =>
   ({
     aggregate: 'conversation',
     aggregateId: id,
-    type: 'conversation.created',
+    type: 'conversation.delete_requested',
     payload: {},
   }) as const;
 
@@ -55,7 +55,7 @@ describe('a successful unit of work', () => {
     expect(await h.db.select().from(conversations)).toHaveLength(1);
     const events = await h.db.select().from(outboxEvents);
     expect(events).toHaveLength(1);
-    expect(events[0]?.type).toBe('conversation.created');
+    expect(events[0]?.type).toBe('conversation.delete_requested');
   });
 
   it('writes several events in the order they were published', async () => {
@@ -67,11 +67,14 @@ describe('a successful unit of work', () => {
         { id: id, title: 'Revenue', createdAt: new Date() },
       );
       ctx.publish(created(id));
-      ctx.publish({ ...created(id), type: 'message.appended' });
+      ctx.publish({ ...created(id), type: 'generation.requested' });
     });
 
     const events = await h.db.select().from(outboxEvents).orderBy(outboxEvents.id);
-    expect(events.map((event) => event.type)).toEqual(['conversation.created', 'message.appended']);
+    expect(events.map((event) => event.type)).toEqual([
+      'conversation.delete_requested',
+      'generation.requested',
+    ]);
   });
 
   it('leaves every event unpublished, for the relay to claim', async () => {
