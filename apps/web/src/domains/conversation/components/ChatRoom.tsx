@@ -159,13 +159,13 @@ function Live({ state }: { readonly state: Generation['state'] }) {
       <Asked question={state.question} />
       <Said role="assistant">
         {state.phase === 'reconnecting' && <Reconnecting />}
-        {state.view.parts.length === 0 && state.view.writingSql === '' && <Thinking />}
+        {state.view.parts.length === 0 && state.view.writingArgs === '' && <Thinking />}
         <Answer
           parts={state.view.parts}
           status="generating"
           live
           verification={state.view.verification}
-          writingSql={state.view.writingSql}
+          writingArgs={state.view.writingArgs}
           recheckAttempt={state.view.recheckAttempt}
         />
       </Said>

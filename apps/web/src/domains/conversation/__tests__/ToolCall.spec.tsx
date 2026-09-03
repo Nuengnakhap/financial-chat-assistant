@@ -118,7 +118,9 @@ describe('a query the policy refused', () => {
 
 describe('a query still being written', () => {
   it('shows it taking shape', () => {
-    render(<WritingQuery sql='{"sql":"SELECT reven' />);
+    // The statement, already read out of the arguments by the answer around it:
+    // this card draws what it is handed and knows nothing about JSON.
+    render(<WritingQuery sql="SELECT reven" />);
 
     expect(screen.getByText(/Writing a query/)).toBeInTheDocument();
     expect(screen.getByText(/SELECT reven/)).toBeInTheDocument();

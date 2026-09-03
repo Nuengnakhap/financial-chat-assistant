@@ -20,8 +20,8 @@ interface StreamingView {
    * written and the answer in the history. There is one of it, not two.
    */
   readonly parts: readonly MessagePart[];
-  /** The query as the model types it, before it is a call that can be run. */
-  readonly writingSql: string;
+  /** The tool call's arguments as they arrive: JSON, not SQL. */
+  readonly writingArgs: string;
   readonly verification: GroundingReport | null;
   /** Above zero while a draft is being written again after the gate stopped one. */
   readonly recheckAttempt: number;
@@ -63,7 +63,7 @@ export const IDLE: GenerationState = { phase: 'idle' };
 
 const EMPTY_VIEW: StreamingView = {
   parts: [],
-  writingSql: '',
+  writingArgs: '',
   verification: null,
   recheckAttempt: 0,
 };
@@ -153,11 +153,11 @@ function applyEvent(view: StreamingView, event: StreamEvent): StreamingView {
     case 'text_delta':
       return { ...view, parts: withText(view.parts, event.delta) };
     case 'tool_call_delta':
-      return { ...view, writingSql: view.writingSql + event.argsDelta };
+      return { ...view, writingArgs: view.writingArgs + event.argsDelta };
     case 'tool_call_ready':
       return {
         ...view,
-        writingSql: '',
+        writingArgs: '',
         parts: [...view.parts, { kind: 'tool_call', id: event.id, sql: event.sql }],
       };
     case 'tool_result':

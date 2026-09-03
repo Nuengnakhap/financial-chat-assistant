@@ -3,6 +3,7 @@ import type { GroundingReport, MessagePart, MessageStatus } from '@fca/contracts
 import { Markdown } from './Markdown';
 import { Caret, ToolCall, WritingQuery } from './ToolCall';
 import { VerifiedBadge } from './VerifiedBadge';
+import { sqlBeingWritten } from '../utils/writing-sql';
 
 /**
  * An answer, whether it is being written or was written last week.
@@ -25,8 +26,11 @@ export interface AnswerProps {
    * caret at the end of one would claim words are arriving here when none are.
    */
   readonly live?: boolean;
-  /** The query still being typed, when this answer is the one being written. */
-  readonly writingSql?: string;
+  /**
+   * The tool call's arguments as they arrive — JSON, not SQL. What is drawn is
+   * the statement inside them; see `sqlBeingWritten`.
+   */
+  readonly writingArgs?: string;
   /** Set while a draft is being written again after the gate stopped one. */
   readonly recheckAttempt?: number;
 }
@@ -36,10 +40,15 @@ export function Answer({
   status,
   verification,
   live = false,
-  writingSql = '',
+  writingArgs = '',
   recheckAttempt = 0,
 }: AnswerProps) {
   const results = resultsByCall(parts);
+  // Read out of the arguments rather than shown as they arrive: the first
+  // deltas of a call are `{`, `{"`, `{"sq`, and a tool that takes `{}` never
+  // has a statement at all — a card headed "Writing a query" over an empty box
+  // announces one that is not being written.
+  const sql = sqlBeingWritten(writingArgs);
 
   return (
     <div className="flex flex-col gap-1">
@@ -51,7 +60,7 @@ export function Answer({
           last={index === parts.length - 1 && live}
         />
       ))}
-      {writingSql !== '' && <WritingQuery sql={writingSql} />}
+      {sql !== '' && <WritingQuery sql={sql} />}
       {recheckAttempt > 0 && <Rechecking />}
       {/* On the finished thing rather than on the unread one: an answer still
           being written has nothing to say about itself yet. */}

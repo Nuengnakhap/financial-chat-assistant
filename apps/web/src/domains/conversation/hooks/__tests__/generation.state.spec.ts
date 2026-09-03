@@ -106,7 +106,7 @@ describe('a query being written', () => {
       frame({ type: 'tool_call_delta', index: 0, argsDelta: ' revenue"}' }),
     );
 
-    expect(state.phase === 'streaming' && state.view.writingSql).toBe('{"sql":"SELECT revenue"}');
+    expect(state.phase === 'streaming' && state.view.writingArgs).toBe('{"sql":"SELECT revenue"}');
   });
 
   it('is cleared by the call that is actually going to run', () => {
@@ -118,7 +118,7 @@ describe('a query being written', () => {
 
     // What runs is the canonical statement the server answered with, not the
     // half-typed JSON it grew out of.
-    expect(state.phase === 'streaming' && state.view.writingSql).toBe('');
+    expect(state.phase === 'streaming' && state.view.writingArgs).toBe('');
     expect(partsOf(state)).toEqual([
       { kind: 'tool_call', id: 'call_1', sql: 'SELECT revenue FROM financial_data' },
     ]);
