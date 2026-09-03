@@ -3,6 +3,7 @@ import { MicroUsd, ReservationId, UserId, isErr, isOk, type Reservation } from '
 import { describe, expect, it } from 'vitest';
 
 import { testConfig } from '../../../shared/config/__tests__/test-config';
+import { Counters } from '../../../shared/observability/counters';
 import { ReservationEstimator } from '../cost-estimator';
 import type { BudgetState, BudgetStore } from '../ports/budget.store';
 import type { ModelInUse } from '../ports/model-in-use.port';
@@ -46,7 +47,7 @@ function reserverWith(model: string, granted = true, resolved: string | null = n
   const endpoint: ModelInUse = { resolved: () => resolved };
   const estimate = new ReservationEstimator(new Pricing(), endpoint, config);
 
-  return { asked, released, use: new ReserveBudgetUseCase(store, estimate) };
+  return { asked, released, use: new ReserveBudgetUseCase(store, estimate, new Counters()) };
 }
 
 describe('holding what an answer might cost', () => {

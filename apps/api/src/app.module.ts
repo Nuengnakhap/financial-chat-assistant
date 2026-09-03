@@ -27,6 +27,7 @@ import { HealthController } from './shared/health/health.controller';
 import { ReadinessProbe } from './shared/health/readiness';
 import { DomainErrorFilter } from './shared/http/domain-error.filter';
 import { AppLogger, createPinoLogger } from './shared/observability/app-logger';
+import { Counters } from './shared/observability/counters';
 import { DatabaseService } from './shared/persistence/database.service';
 import { PersistenceModule } from './shared/persistence/persistence.module';
 import { DOMAIN_EVENT_HANDLERS, type DomainEventHandler } from './shared/queue/domain-events';
@@ -71,6 +72,7 @@ import { RedisService } from './shared/redis/redis.service';
     },
     ReadinessProbe,
     TaskRegistry,
+    Counters,
     // What "ready" means, stated in one place: a request cannot be served
     // without any of these. Listing them here rather than letting each module
     // provide the token is what stops a second list from silently replacing the
@@ -116,6 +118,7 @@ import { RedisService } from './shared/redis/redis.service';
     AppLogger,
     ReadinessProbe,
     TaskRegistry,
+    Counters,
     DOMAIN_EVENT_HANDLERS,
     GENERATION_BUDGET,
     USAGE_SETTLEMENT,

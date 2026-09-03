@@ -19,6 +19,8 @@ import { EndAbandonedGenerationsUseCase } from './application/use-cases/end-aban
 import { StopGenerationUseCase } from './application/use-cases/stop-generation.use-case';
 import { WatchGenerationUseCase } from './application/use-cases/watch-generation.use-case';
 import { CachedFinancialQuery } from './infrastructure/cached-financial-query';
+import { CountingGenerationEvents } from './infrastructure/counting-generation-events';
+import { CountingSqlPolicy } from './infrastructure/counting-sql-policy';
 import { DescribeCoverageTool } from './infrastructure/describe-coverage.tool';
 import { DrizzleGenerationMessages } from './infrastructure/drizzle-generation-messages';
 import { PgFinancialQueryTool } from './infrastructure/financial-query.tool';
@@ -67,7 +69,10 @@ import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
     // module in `onModuleInit`, and two bindings of the same class would be two
     // instances of it, each booting a parser the other cannot see it has.
     PgAstSqlPolicy,
-    { provide: SQL_POLICY, useExisting: PgAstSqlPolicy },
+    // Wrapped so the policy stays a pure function of a string, with nothing to
+    // reset between calls, and the numbers still get counted per rule.
+    CountingSqlPolicy,
+    { provide: SQL_POLICY, useExisting: CountingSqlPolicy },
     CachedFinancialQuery,
     PgFinancialQueryTool,
     DescribeCoverageTool,
@@ -93,7 +98,10 @@ import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
     AgentRunner,
     StreamMultiplexer,
     GenerationStream,
-    { provide: GENERATION_EVENTS, useExisting: GenerationStream },
+    // Wrapped rather than instrumented: the stream is the one place every
+    // generation event passes, so the numbers cost no parameter anywhere else.
+    CountingGenerationEvents,
+    { provide: GENERATION_EVENTS, useExisting: CountingGenerationEvents },
     DrizzleGenerationMessages,
     { provide: GENERATION_MESSAGES, useExisting: DrizzleGenerationMessages },
     RedisGenerationStops,
