@@ -21,7 +21,7 @@ interface FakeGateway {
 
 function fakeGateway(): FakeGateway {
   const fake: FakeGateway = {
-    answer: { usable: true, missing: [] },
+    answer: { usable: true, missing: [], model: 'gpt-5.6-luna' },
     checks: 0,
     gateway: {
       streamCompletion: () => {
@@ -70,13 +70,14 @@ describe('the capability check', () => {
 
     await service.measure(signal);
 
-    expect(service.current()).toEqual({ usable: true, missing: [] });
+    expect(service.current()).toEqual({ usable: true, missing: [], model: 'gpt-5.6-luna' });
   });
 
   it('says every reason, because each one is a different thing to fix', async () => {
     fake.answer = {
       usable: false,
       missing: ['the endpoint returned no streamed chunks', 'the endpoint did not call the tool'],
+      model: '',
     };
 
     await service.measure(signal);
@@ -87,7 +88,7 @@ describe('the capability check', () => {
   });
 
   it('says it once rather than every five minutes', async () => {
-    fake.answer = { usable: false, missing: ['the endpoint is not there'] };
+    fake.answer = { usable: false, missing: ['the endpoint is not there'], model: '' };
     await service.measure(signal);
     const said = capture.text().length;
 
@@ -97,9 +98,9 @@ describe('the capability check', () => {
   });
 
   it('says so again when a broken endpoint starts working', async () => {
-    fake.answer = { usable: false, missing: ['the endpoint is not there'] };
+    fake.answer = { usable: false, missing: ['the endpoint is not there'], model: '' };
     await service.measure(signal);
-    fake.answer = { usable: true, missing: [] };
+    fake.answer = { usable: true, missing: [], model: 'gpt-5.6-luna' };
 
     await service.measure(signal);
 
@@ -115,7 +116,11 @@ describe('the capability check', () => {
 
     await service.measure(signal);
 
-    expect(service.current()).toEqual({ usable: false, missing: ['the client library gave up'] });
+    expect(service.current()).toEqual({
+      usable: false,
+      missing: ['the client library gave up'],
+      model: '',
+    });
     expect(capture.text()).toContain('the client library gave up');
   });
 
@@ -140,5 +145,29 @@ describe('the capability check', () => {
     await loop;
 
     expect(fake.checks).toBeGreaterThan(1);
+  });
+});
+
+describe('what the endpoint answers as', () => {
+  it('is available to whoever has to put a price on a question', async () => {
+    // A router takes `auto` and resolves per request; this call is the one
+    // moment before a question when the answer is knowable.
+    fake.answer = { usable: true, missing: [], model: 'gpt-5.6-luna' };
+
+    await service.measure(signal);
+
+    expect(service.resolved()).toBe('gpt-5.6-luna');
+  });
+
+  it('is nothing until something has answered, which is not the same as unknown', () => {
+    expect(service.resolved()).toBeNull();
+  });
+
+  it('is nothing for an endpoint that never says which model it used', async () => {
+    fake.answer = { usable: true, missing: [], model: '' };
+
+    await service.measure(signal);
+
+    expect(service.resolved()).toBeNull();
   });
 });

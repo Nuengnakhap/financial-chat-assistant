@@ -68,7 +68,16 @@ export type CompletionChunk =
       readonly argumentsDelta: string;
     }
   | { readonly kind: 'tool_calls'; readonly calls: readonly ToolCall[] }
-  | { readonly kind: 'usage'; readonly usage: CompletionUsage }
+  | {
+      readonly kind: 'usage';
+      readonly usage: CompletionUsage;
+      /**
+       * The model the provider says answered, which is what it charges for.
+       * Empty when it said nothing — a name nobody can price, which is priced
+       * as the dearest one rather than as free.
+       */
+      readonly model: string;
+    }
   | { readonly kind: 'finish'; readonly reason: FinishReason };
 
 /** What a smoke call at boot found out, in the words a person needs to fix it. */
@@ -76,6 +85,12 @@ export interface Capabilities {
   readonly usable: boolean;
   /** Empty when usable; otherwise what is missing, said plainly. */
   readonly missing: readonly string[];
+  /**
+   * The model the endpoint answered with, which is not always the one it was
+   * asked for: a router takes `auto` and resolves it. Empty when it said
+   * nothing, or when the call did not get far enough to be told.
+   */
+  readonly model: string;
 }
 
 export interface LlmGateway {

@@ -139,7 +139,7 @@ export class OpenAiLlmGateway implements LlmGateway {
     try {
       return await this.smokeCall(signal);
     } catch (error) {
-      return { usable: false, missing: [describe(error)] };
+      return { usable: false, missing: [describe(error)], model: '' };
     }
   }
 
@@ -165,7 +165,7 @@ export class OpenAiLlmGateway implements LlmGateway {
       missing.push(`the endpoint did not call ${QUERY_TOOL.name} when asked to`);
     }
 
-    return { usable: missing.length === 0, missing };
+    return { usable: missing.length === 0, missing, model: modelIn(chunks) };
   }
 }
 
@@ -196,4 +196,15 @@ function saysSomethingAboutTheEndpoint(error: unknown): boolean {
 function describe(error: unknown): string {
   if (error instanceof OpenAI.APIError) return `the endpoint refused the call: ${error.message}`;
   return error instanceof Error ? error.message : 'the endpoint could not be reached';
+}
+
+/**
+ * What the endpoint answered as. Worth one line here because it is the only
+ * place the name is knowable before a question is asked — and what a question
+ * may cost has to be known before it is allowed to start.
+ */
+function modelIn(chunks: readonly CompletionChunk[]): string {
+  const reported = chunks.find((chunk) => chunk.kind === 'usage');
+
+  return reported?.model ?? '';
 }

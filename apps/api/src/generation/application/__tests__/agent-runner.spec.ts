@@ -67,6 +67,9 @@ function costs(promptTokens: number, cached = 0): CompletionChunk {
   return {
     kind: 'usage',
     usage: { promptTokens, completionTokens: 40, cachedPromptTokens: cached },
+    // The name the provider answered with, which is what the round is charged
+    // to — not the name it was asked for.
+    model: 'gpt-5.6-luna',
   };
 }
 
@@ -99,7 +102,8 @@ function fakeGateway(...turns: (readonly CompletionChunk[])[]): FakeGateway {
     sent: [],
     aborted: 0,
     gateway: {
-      checkCapabilities: async () => await Promise.resolve({ usable: true, missing: [] }),
+      checkCapabilities: async () =>
+        await Promise.resolve({ usable: true, missing: [], model: 'gpt-5.6-luna' }),
       streamCompletion: (request, signal): AsyncIterable<CompletionChunk> => {
         const chunks = fake.turns[fake.requests] ?? [];
         fake.requests += 1;
@@ -261,8 +265,20 @@ describe('a question that is answered', () => {
     // One per round: what a generation costs is the sum of its rounds, and the
     // runner does not add up money — it reports what it was told.
     expect(events.filter((event) => event.type === 'usage')).toEqual([
-      { type: 'usage', inputTokens: 1_800, outputTokens: 40, cachedInputTokens: 0 },
-      { type: 'usage', inputTokens: 1_900, outputTokens: 40, cachedInputTokens: 1_536 },
+      {
+        type: 'usage',
+        inputTokens: 1_800,
+        outputTokens: 40,
+        cachedInputTokens: 0,
+        model: 'gpt-5.6-luna',
+      },
+      {
+        type: 'usage',
+        inputTokens: 1_900,
+        outputTokens: 40,
+        cachedInputTokens: 1_536,
+        model: 'gpt-5.6-luna',
+      },
     ]);
   });
 

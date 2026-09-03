@@ -95,7 +95,7 @@ export class Draft {
         }
 
         if (chunk.kind === 'tool_calls') calls = chunk.calls;
-        if (chunk.kind === 'usage') yield usageOf(chunk.usage);
+        if (chunk.kind === 'usage') yield usageOf(chunk.usage, chunk.model);
         if (chunk.kind === 'tool_call_delta') {
           yield { type: 'tool_call_delta', index: chunk.index, argsDelta: chunk.argumentsDelta };
         }
@@ -192,16 +192,20 @@ function stoppedOrFailed(signal: AbortSignal, text: string): Written {
   return { kind: 'failed' };
 }
 
-function usageOf(usage: {
-  readonly promptTokens: number;
-  readonly completionTokens: number;
-  readonly cachedPromptTokens: number;
-}): AgentEvent {
+function usageOf(
+  usage: {
+    readonly promptTokens: number;
+    readonly completionTokens: number;
+    readonly cachedPromptTokens: number;
+  },
+  model: string,
+): AgentEvent {
   return {
     type: 'usage',
     inputTokens: usage.promptTokens,
     outputTokens: usage.completionTokens,
     cachedInputTokens: usage.cachedPromptTokens,
+    model,
   };
 }
 

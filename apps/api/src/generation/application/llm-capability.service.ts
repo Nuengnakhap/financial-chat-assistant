@@ -78,12 +78,23 @@ export class LlmCapabilityService implements OnApplicationBootstrap {
     try {
       return await this.gateway.checkCapabilities(signal);
     } catch (error) {
-      return { usable: false, missing: [asError(error).message] };
+      return { usable: false, missing: [asError(error).message], model: '' };
     }
   }
 
   /** `null` until the first call answers — which is not the same as unusable. */
   current(): Capabilities | null {
     return this.verdict;
+  }
+
+  /**
+   * The name the endpoint answered with, for whoever has to put a price on a
+   * question before it is asked. `null` until something has answered, and for
+   * an endpoint that never says.
+   */
+  resolved(): string | null {
+    const model = this.verdict?.model ?? '';
+
+    return model === '' ? null : model;
   }
 }

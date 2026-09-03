@@ -50,6 +50,12 @@ export type AgentEvent =
       readonly outputTokens: number;
       /** Of the input, how many the provider served from its own cache. */
       readonly cachedInputTokens: number;
+      /**
+       * Which model this round was charged to. It travels with the usage rather
+       * than being read once at the start, because a router resolves `auto` per
+       * request and the two numbers are only meaningful together.
+       */
+      readonly model: string;
     }
   /**
    * The last event of every generation that reached an end of its own. `report`

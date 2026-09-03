@@ -82,10 +82,15 @@ function asObject(value: unknown): Record<string, unknown> {
 export async function* toChunks(stream: AsyncIterable<SdkChunk>): AsyncIterable<CompletionChunk> {
   const calls = new PartialCalls();
   let finished = false;
+  // The name the provider answers with, which is not always the name it was
+  // asked for: a router takes `auto` and picks. What a generation is charged
+  // has to be the model that actually ran it.
+  let model = '';
 
   for await (const raw of stream) {
+    if (raw.model !== '') model = raw.model;
     // A usage chunk carries no choices at all, which is why this comes first.
-    if (raw.usage) yield usageOf(raw.usage);
+    if (raw.usage) yield usageOf(raw.usage, model);
 
     const choice = raw.choices[0];
     if (choice === undefined) continue;
@@ -165,17 +170,35 @@ function keep(next: string | undefined, existing: string): string {
   return next === undefined || next === '' ? existing : next;
 }
 
-function usageOf(usage: OpenAI.Completions.CompletionUsage): CompletionChunk {
+function usageOf(usage: OpenAI.Completions.CompletionUsage, model: string): CompletionChunk {
   return {
     kind: 'usage',
+    model,
     usage: {
       promptTokens: usage.prompt_tokens,
       completionTokens: usage.completion_tokens,
-      // Absent on the first call and on providers that do not cache; zero is the
-      // honest reading of both, since nothing was served from a cache either way.
-      cachedPromptTokens: usage.prompt_tokens_details?.cached_tokens ?? 0,
+      cachedPromptTokens: cachedTokensOf(usage),
     },
   };
+}
+
+/**
+ * Two spellings of one number. OpenAI reports a cached prefix under
+ * `prompt_tokens_details.cached_tokens`; other endpoints of the same protocol
+ * report `cache_read_tokens` beside the totals — measured on the configured one,
+ * which sends the second and never the first. Reading only one of them prices a
+ * cached prefix at full rate for ever, silently.
+ *
+ * Absent on a first call and on a provider that does not cache at all; zero is
+ * the honest reading of both, and the expensive side of the guess.
+ */
+function cachedTokensOf(usage: OpenAI.Completions.CompletionUsage): number {
+  const detailed = usage.prompt_tokens_details?.cached_tokens;
+  if (detailed !== undefined) return detailed;
+
+  const read: unknown = Reflect.get(usage, 'cache_read_tokens');
+
+  return typeof read === 'number' && Number.isFinite(read) ? read : 0;
 }
 
 function finishReasonOf(reason: string): FinishReason {

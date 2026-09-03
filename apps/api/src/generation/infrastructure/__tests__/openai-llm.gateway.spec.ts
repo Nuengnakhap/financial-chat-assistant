@@ -286,6 +286,10 @@ describe('what a generation cost', () => {
       {
         kind: 'usage',
         usage: { promptTokens: 1_825, completionTokens: 20, cachedPromptTokens: 1_536 },
+        // The name the provider answered with. A router is asked for `auto` and
+        // resolves it per request, so this is the only place the model that has
+        // to be paid for is stated.
+        model: 'm',
       },
     ]);
   });
@@ -310,6 +314,37 @@ describe('what a generation cost', () => {
     expect(reported).toEqual({
       kind: 'usage',
       usage: { promptTokens: 100, completionTokens: 5, cachedPromptTokens: 0 },
+      model: 'm',
+    });
+  });
+
+  it('reads the cached prefix an endpoint reports beside the totals', async () => {
+    // Measured on the configured endpoint: it reports `cache_read_tokens` and
+    // never `prompt_tokens_details`, so reading only the OpenAI spelling prices
+    // every cached prefix at full rate for ever, and nothing says so.
+    fake.chunks = [
+      stop('stop'),
+      {
+        id: 'c',
+        created: 0,
+        model: 'gpt-5.6-luna',
+        object: 'chat.completion.chunk',
+        choices: [],
+        usage: Object.assign(
+          { prompt_tokens: 1_812, completion_tokens: 5, total_tokens: 1_817 },
+          { cache_read_tokens: 1_536 },
+        ),
+      },
+    ];
+
+    const [, reported] = await collect(
+      gateway.streamCompletion(REQUEST, new AbortController().signal),
+    );
+
+    expect(reported).toEqual({
+      kind: 'usage',
+      usage: { promptTokens: 1_812, completionTokens: 5, cachedPromptTokens: 1_536 },
+      model: 'gpt-5.6-luna',
     });
   });
 });
@@ -384,7 +419,30 @@ describe('the capability check', () => {
     expect(await gateway.checkCapabilities(new AbortController().signal)).toEqual({
       usable: true,
       missing: [],
+      // Nothing reported usage, so nothing said which model answered. Empty is
+      // the truthful reading of that, and it prices as the dearest there is.
+      model: '',
     });
+  });
+
+  it('brings back the name the endpoint answered with', async () => {
+    // The one moment before a question is asked when a router will say what
+    // `auto` means here — and what a question may cost has to be known before
+    // it is allowed to start.
+    fake.chunks = [
+      toolCall({
+        index: 0,
+        id: 'call_1',
+        name: 'query_financial_data',
+        args: '{"sql":"SELECT 1"}',
+      }),
+      stop('tool_calls'),
+      usage(20, 0),
+    ];
+
+    const found = await gateway.checkCapabilities(new AbortController().signal);
+
+    expect(found.model).toBe('m');
   });
 
   it('fails when the endpoint answers in words but never calls the tool', async () => {
@@ -405,6 +463,7 @@ describe('the capability check', () => {
     expect(await gateway.checkCapabilities(new AbortController().signal)).toEqual({
       usable: false,
       missing: ['connect ECONNREFUSED 127.0.0.1:443'],
+      model: '',
     });
   });
 
@@ -451,7 +510,30 @@ describe('the capability check', () => {
     expect(await gateway.checkCapabilities(new AbortController().signal)).toEqual({
       usable: true,
       missing: [],
+      // Nothing reported usage, so nothing said which model answered. Empty is
+      // the truthful reading of that, and it prices as the dearest there is.
+      model: '',
     });
+  });
+
+  it('brings back the name the endpoint answered with', async () => {
+    // The one moment before a question is asked when a router will say what
+    // `auto` means here — and what a question may cost has to be known before
+    // it is allowed to start.
+    fake.chunks = [
+      toolCall({
+        index: 0,
+        id: 'call_1',
+        name: 'query_financial_data',
+        args: '{"sql":"SELECT 1"}',
+      }),
+      stop('tool_calls'),
+      usage(20, 0),
+    ];
+
+    const found = await gateway.checkCapabilities(new AbortController().signal);
+
+    expect(found.model).toBe('m');
   });
 
   it('stops asking an endpoint that keeps failing', async () => {
