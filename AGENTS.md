@@ -43,7 +43,8 @@ Scope: runs locally (Docker Compose + `pnpm dev`). Deployment concerns
 ## Architecture in one screen
 
 - Hexagonal: `presentation → application → domain`, `infrastructure → application`.
-  Enforced by dependency-cruiser in CI, not by convention.
+  Enforced by dependency-cruiser inside `pnpm check`, which CI runs on every
+  push — not by convention.
 - `apps/web` is domain-driven: a capability lives in `domains/<name>` and is
   entered only through its `index.ts`, one domain never imports another's
   internals, and `components/` is presentational — anything that fetches or
@@ -148,6 +149,13 @@ pnpm drill <redis|postgres>  # stop a dependency under a running API and watch i
 Everything in this list runs today. The last three are separate from the gate
 on purpose: one drives a browser, one spends real money, and one stops a
 database — none of which belongs in a command somebody runs before every commit.
+
+`.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile`, `pnpm check`
+and `pnpm audit`, then `pnpm test:integration` on a second runner. Those three
+stay out of it for the same reason they stay out of `pnpm check`, and because a
+pull request from a fork has no API key to spend. **A command this file or any
+README tells somebody to run must exist in a `package.json`** — a test in
+`tools/docs/` holds that, after two of them went missing for a day.
 
 ## Definition of done for a change
 

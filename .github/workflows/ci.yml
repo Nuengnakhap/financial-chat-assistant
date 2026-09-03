@@ -1,0 +1,67 @@
+# The gate, run by a machine that has never seen this repository before.
+#
+# Two jobs, and the split is about what each one needs rather than how long it
+# takes: `verify` needs nothing but the source, so it runs on every push in a
+# couple of minutes; `integration` needs Docker, because persistence here is
+# proven against a real PostgreSQL and Redis rather than against fakes.
+#
+# What is deliberately absent: `pnpm test:e2e` and `pnpm eval:live` both need a
+# language model, which means an API key and real money per push — a pull
+# request from a fork has no secrets anyway, and a gate that cannot run on a
+# contribution is not a gate. `pnpm drill` stops a dependency underneath a
+# running system, and nothing is running here. All three are documented as
+# outside this gate in AGENTS.md, and this is the same line drawn twice.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first one's answer irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: build, types, lint, boundaries, migrations, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      # Frozen, so a lockfile that disagrees with a package.json fails here
+      # rather than resolving to something nobody chose.
+      - run: pnpm install --frozen-lockfile
+      # One command, the same one a person runs before saying they are done:
+      # build, format, typecheck, lint (ESLint + dependency-cruiser + knip),
+      # drizzle-kit check, and the unit suites — including the secret scan and
+      # the contract snapshot gate, which are tests rather than separate steps.
+      - run: pnpm check
+      - run: pnpm audit --audit-level high
+
+  integration:
+    name: persistence against a real PostgreSQL and Redis
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # `apps/api` resolves the built packages rather than their source, so this
+      # suite runs against the same artefacts the API ships with.
+      - run: pnpm build
+      # testcontainers starts PostgreSQL 18 and Redis 8 on the runner's own
+      # Docker daemon and tears them down afterwards.
+      - run: pnpm test:integration
