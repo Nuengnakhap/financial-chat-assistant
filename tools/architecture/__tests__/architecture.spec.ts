@@ -38,16 +38,37 @@ const LINTED_TARGETS = [
   'vitest.config.mts',
 ];
 
+/**
+ * The whole graph as JSON, which is already over a megabyte and grows with every
+ * file added to the repository. `spawnSync` buffers a megabyte by default and
+ * then kills the child, so the output arrives cut off in the middle of a string
+ * and `JSON.parse` fails somewhere around line thirty thousand — a boundary
+ * check that reads as a broken tree rather than as a limit nobody set.
+ */
+const OUTPUT_LIMIT_BYTES = 64 * 1024 * 1024;
+
 function cruise(targets: readonly string[], cwd: string): CruiseResult {
   const result = spawnSync(
     'pnpm',
     ['exec', 'depcruise', ...targets, '--config', CONFIG, '--output-type', 'json'],
-    { cwd, encoding: 'utf8', shell: process.platform === 'win32' },
+    {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: OUTPUT_LIMIT_BYTES,
+      shell: process.platform === 'win32',
+    },
   );
 
+  // Said out loud rather than left to `JSON.parse`: a truncated buffer and a
+  // crashed cruiser both arrive as unreadable output, and they are not the
+  // same problem.
+  if (result.error !== undefined) {
+    throw new Error(`dependency-cruiser could not be read: ${result.error.message}`);
+  }
   if (result.stdout === '') {
     throw new Error(`dependency-cruiser produced no output.\n${result.stderr}`);
   }
+
   return JSON.parse(result.stdout) as CruiseResult;
 }
 
