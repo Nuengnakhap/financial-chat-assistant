@@ -33,3 +33,8 @@ Thumbs.db
 
 # local design notes
 .plan
+
+# Signed-in cookies Playwright writes before a run.
+e2e/.auth/
+test-results/
+playwright-report/

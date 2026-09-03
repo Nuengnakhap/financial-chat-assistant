@@ -1,0 +1,15 @@
+{
+  // The browser suite. Outside the solution build: nothing here is emitted, and
+  // it runs through Playwright's own transpiler rather than `tsc`.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../playwright.config.ts"]
+}
