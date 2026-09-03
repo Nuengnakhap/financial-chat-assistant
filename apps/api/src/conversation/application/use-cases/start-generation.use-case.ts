@@ -2,12 +2,14 @@ import {
   ConflictError,
   Err,
   Ok,
+  isErr,
   titleFromMessage,
   type ClientMessageId,
   type ConversationId,
   type DomainError,
   type MessageId,
   type OwnerScope,
+  type Reservation,
   type Result,
 } from '@fca/domain';
 import { Inject, Injectable } from '@nestjs/common';
@@ -22,12 +24,18 @@ import {
   type UnitOfWork,
 } from '../../../shared/persistence/unit-of-work';
 import { conversationGone } from '../conversation-id';
+import { GENERATION_BUDGET, type GenerationBudget } from '../ports/budget.port';
 import type { StoredMessage } from '../ports/message.repository';
 
 export interface StartGeneration {
   readonly conversationId: ConversationId;
   readonly clientMessageId: ClientMessageId;
   readonly content: string;
+}
+
+/** A send, plus the claim held for the answer it is about to be given. */
+interface Asked extends StartGeneration {
+  readonly reservation: Reservation;
 }
 
 export interface StartedGeneration {
@@ -58,20 +66,32 @@ const CONVERSATION_FK = 'messages_conversation_id_conversations_id_fk';
  */
 @Injectable()
 export class StartGenerationUseCase {
-  constructor(@Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork) {}
+  constructor(
+    @Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork,
+    @Inject(GENERATION_BUDGET) private readonly budget: GenerationBudget,
+  ) {}
 
   async execute(
     scope: OwnerScope,
     sent: StartGeneration,
   ): Promise<Result<StartedGeneration, DomainError>> {
+    // Before the transaction, because it is not a database write and cannot
+    // join one — and before the question is stored, because a question written
+    // down against a refusal sits in the transcript with no answer coming.
+    const held = await this.budget.reserve(scope.userId);
+    if (isErr(held)) return held;
+
     try {
-      return await this.uow.run(async (ctx) => await this.write(ctx, scope, sent));
+      return await this.startWith(held.value, scope, sent);
     } catch (error) {
+      // Nothing below this line starts a generation, so the claim goes back
+      // here rather than in each of the four ways this can end.
+      await this.budget.release(held.value);
       if (isForeignKeyViolationOf(error, CONVERSATION_FK)) return Err(conversationGone());
-      // G1, held by a partial unique index: a conversation has at most one answer
-      // being written at a time. The second question is refused rather than
-      // queued, because a queued one would be answered against a transcript the
-      // asker has not read yet.
+      // G1, held by a partial unique index: a conversation has at most one
+      // answer being written at a time. The second question is refused rather
+      // than queued, because a queued one would be answered against a
+      // transcript the asker has not read yet.
       if (isUniqueViolationOf(error, 'uq_active_generation')) {
         return Err(new ConflictError('A generation is already running in this conversation.'));
       }
@@ -79,6 +99,24 @@ export class StartGenerationUseCase {
 
       return await this.recall(sent, error);
     }
+  }
+
+  /**
+   * A conversation that turned out not to be there is a generation that will
+   * not happen, and the claim held for it goes back — the transaction rolled
+   * back without throwing, so nothing else would notice.
+   */
+  private async startWith(
+    reservation: Reservation,
+    scope: OwnerScope,
+    sent: StartGeneration,
+  ): Promise<Result<StartedGeneration, DomainError>> {
+    const started = await this.uow.run(
+      async (ctx) => await this.write(ctx, scope, { ...sent, reservation }),
+    );
+    if (isErr(started)) await this.budget.release(reservation);
+
+    return started;
   }
 
   /**
@@ -90,7 +128,7 @@ export class StartGenerationUseCase {
   private async write(
     ctx: TxContext,
     scope: OwnerScope,
-    sent: StartGeneration,
+    sent: Asked,
   ): Promise<Result<StartedGeneration, DomainError>> {
     const conversation = await ctx.conversations.findById(scope, sent.conversationId);
     if (conversation === null) return Err(conversationGone());
@@ -108,6 +146,7 @@ export class StartGenerationUseCase {
       role: 'assistant',
       parts: [],
       status: 'generating',
+      reservation: sent.reservation,
     });
 
     // Named and reordered in the same transaction as the message. A title

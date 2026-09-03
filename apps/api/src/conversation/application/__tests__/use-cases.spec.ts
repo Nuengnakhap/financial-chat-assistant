@@ -1,14 +1,21 @@
 import {
+  BudgetExceededError,
   ClientMessageId,
   ConversationId,
+  Err,
+  Ok,
+  ReservationId,
   type DomainEvent,
+  type Result,
   type OwnerScope,
+  type Reservation,
   type UserId,
 } from '@fca/domain';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TxContext, UnitOfWork } from '../../../shared/persistence/unit-of-work';
 import { conversationCursor, messageCursor } from '../pagination';
+import type { GenerationBudget } from '../ports/budget.port';
 import type { ConversationRepository } from '../ports/conversation.repository';
 import type { MessageRepository } from '../ports/message.repository';
 import { CreateConversationUseCase } from '../use-cases/create-conversation.use-case';
@@ -294,6 +301,18 @@ describe('reading the history of a conversation', () => {
 describe('starting an answer', () => {
   const CLIENT_ID = ClientMessageId.trusted('9b1e2f3a-4c5d-4e6f-8a9b-0c1d2e3f4a5b');
   const sent = { conversationId: ID, clientMessageId: CLIENT_ID, content: 'hello' };
+  const RESERVATION: Reservation = {
+    userId: SCOPE.userId,
+    id: ReservationId.trusted('0d4a1b2c-3e4f-4a5b-8c6d-7e8f9a0b1c2d'),
+    windowStart: NOW,
+  };
+  /** Granted unless a test says otherwise; releases are counted. */
+  const reserve: GenerationBudget['reserve'] = vi.fn(
+    async () => await Promise.resolve<Result<Reservation, BudgetExceededError>>(Ok(RESERVATION)),
+  );
+  const release = vi.fn(async () => await Promise.resolve());
+  const reserved = vi.mocked(reserve);
+  const budget: GenerationBudget = { reserve, release };
   const question = { id: '2b8e1b4a-6a1e-4d5e-9c3f-0f1a2b3c4d5e', seq: 1, createdAt: NOW };
   const answer = { id: '7f3c9d2e-5b4a-4c1d-8e6f-9a0b1c2d3e4f', seq: 2, createdAt: NOW };
 
@@ -302,7 +321,12 @@ describe('starting an answer', () => {
     appendMessage.mockResolvedValueOnce(question).mockResolvedValueOnce(answer);
   };
 
-  const start = () => new StartGenerationUseCase(uow).execute(SCOPE, sent);
+  const start = () => new StartGenerationUseCase(uow, budget).execute(SCOPE, sent);
+
+  beforeEach(() => {
+    reserved.mockResolvedValue(Ok(RESERVATION));
+    release.mockClear();
+  });
 
   it('writes the question, the row its answer goes in, and the event that starts one', async () => {
     findById.mockResolvedValue(summary());
@@ -319,6 +343,10 @@ describe('starting an answer', () => {
       role: 'assistant',
       parts: [],
       status: 'generating',
+      // The claim goes down with the row it belongs to. Written afterwards, a
+      // crash in between leaves an answer nothing can ever give the budget back
+      // for — and the process that would have known is the one that died.
+      reservation: RESERVATION,
     });
     // Buffered by the same unit of work that wrote the rows: the runner cannot
     // be told about an answer that was rolled back.
@@ -330,6 +358,48 @@ describe('starting an answer', () => {
         payload: { conversationId: ID, userId: ADA },
       },
     ]);
+  });
+
+  it('refuses before writing anything down when the budget is spent', async () => {
+    reserved.mockResolvedValue(Err(new BudgetExceededError('Not enough budget remains.')));
+
+    const refused = await start();
+
+    expect(!refused.ok && refused.error.code).toBe('budget_exceeded');
+    // Nothing was stored and nothing was started: a question written down
+    // against a refusal sits in the transcript with no answer ever coming.
+    expect(appendMessage).not.toHaveBeenCalled();
+    expect(published).toEqual([]);
+  });
+
+  it('gives the claim back for every ending that is not a generation', async () => {
+    findById.mockResolvedValue(summary());
+    appendMessage.mockRejectedValue(violation('23505', 'uq_active_generation'));
+
+    await start();
+
+    // Held before the transaction and unusable after it failed. Left held, a
+    // burst of refused sends would eat somebody's window without answering
+    // anything.
+    expect(release).toHaveBeenCalledWith(RESERVATION);
+  });
+
+  it('gives the claim back when the conversation turns out not to be there', async () => {
+    // The transaction rolls back without throwing, so nothing else would notice.
+    findById.mockResolvedValue(null);
+
+    await start();
+
+    expect(release).toHaveBeenCalledWith(RESERVATION);
+  });
+
+  it('keeps the claim when an answer really is about to be written', async () => {
+    findById.mockResolvedValue(summary());
+    bothRowsWritten();
+
+    await start();
+
+    expect(release).not.toHaveBeenCalled();
   });
 
   it('answers not found when the conversation went while it was being written to', () => {

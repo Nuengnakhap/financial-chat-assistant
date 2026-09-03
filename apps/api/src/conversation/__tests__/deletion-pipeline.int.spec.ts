@@ -1,6 +1,7 @@
 import fastifyCookie from '@fastify/cookie';
 import type { AppConfig } from '@fca/config';
 import { conversationsContract } from '@fca/contracts';
+import { Ok, ReservationId } from '@fca/domain';
 import { Global, Module } from '@nestjs/common';
 import { APP_FILTER, NestFactory } from '@nestjs/core';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -22,6 +23,7 @@ import { startHarness, type Harness } from '../../shared/persistence/__tests__/h
 import { conversations, messages, outboxEvents } from '../../shared/persistence/schema';
 import { DOMAIN_EVENT_HANDLERS, type DomainEventHandler } from '../../shared/queue/domain-events';
 import { QueueModule } from '../../shared/queue/queue.module';
+import { GENERATION_BUDGET, type GenerationBudget } from '../application/ports/budget.port';
 import { ConversationModule } from '../conversation.module';
 import { ConversationDeletionSubscriber } from '../infrastructure/conversation-deletion.subscriber';
 
@@ -43,10 +45,29 @@ function integrationConfig(): AppConfig {
   return { ...base, database: { ...base.database, url: database }, redis: { url: redis } };
 }
 
+/**
+ * A budget that always grants. This file is about conversations, and the real
+ * one lives in another context — which the boundary rules will not let a
+ * context reach into, and rightly: what binds the two is the composition root,
+ * and that is exercised where the whole graph is booted.
+ */
+const budget: GenerationBudget = {
+  reserve: async (userId) =>
+    await Promise.resolve(
+      Ok({
+        userId,
+        id: ReservationId.trusted('7a1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d'),
+        windowStart: new Date('2026-09-02T14:00:00.000Z'),
+      }),
+    ),
+  release: async () => await Promise.resolve(),
+};
+
 @Global()
 @Module({
   imports: [IdentityModule, ConversationModule, QueueModule],
   providers: [
+    { provide: GENERATION_BUDGET, useValue: budget },
     { provide: APP_CONFIG, useFactory: integrationConfig },
     {
       provide: AppLogger,
@@ -63,7 +84,7 @@ function integrationConfig(): AppConfig {
       inject: [ConversationDeletionSubscriber],
     },
   ],
-  exports: [APP_CONFIG, AppLogger, TaskRegistry, DOMAIN_EVENT_HANDLERS],
+  exports: [APP_CONFIG, AppLogger, TaskRegistry, DOMAIN_EVENT_HANDLERS, GENERATION_BUDGET],
 })
 class DeletionPipelineModule {}
 

@@ -1,5 +1,12 @@
 import type { AppConfig } from '@fca/config';
-import { ClientMessageId, type ConversationId, type UserId } from '@fca/domain';
+import {
+  ClientMessageId,
+  Ok,
+  ReservationId,
+  type ConversationId,
+  type Reservation,
+  type UserId,
+} from '@fca/domain';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -13,6 +20,7 @@ import {
 import { DatabaseService } from '../../shared/persistence/database.service';
 import { DrizzleUnitOfWork } from '../../shared/persistence/drizzle-unit-of-work';
 import { conversations, messages, outboxEvents } from '../../shared/persistence/schema';
+import type { GenerationBudget } from '../application/ports/budget.port';
 import { StartGenerationUseCase } from '../application/use-cases/start-generation.use-case';
 
 /**
@@ -30,6 +38,25 @@ function integrationConfig(): AppConfig {
   return { ...base, database: { ...base.database, url } };
 }
 
+/**
+ * Always granted here: what this file is about is the rows, and refusing is
+ * covered where the arithmetic is. The claim it hands back is the one the row
+ * has to come back carrying.
+ */
+const RESERVATION: Reservation = {
+  userId: ReservationId.trusted('00000000-0000-4000-8000-000000000000') as unknown as UserId,
+  id: ReservationId.trusted('7a1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d'),
+  windowStart: new Date('2026-09-02T14:00:00.000Z'),
+};
+const released: Reservation[] = [];
+const budget: GenerationBudget = {
+  reserve: async () => await Promise.resolve(Ok({ ...RESERVATION, userId: ada })),
+  release: async (reservation) => {
+    released.push(reservation);
+    await Promise.resolve();
+  },
+};
+
 let harness: Harness;
 let database: DatabaseService;
 let start: StartGenerationUseCase;
@@ -39,7 +66,7 @@ let room: ConversationId;
 beforeAll(async () => {
   harness = await startHarness();
   database = new DatabaseService(integrationConfig());
-  start = new StartGenerationUseCase(new DrizzleUnitOfWork(database));
+  start = new StartGenerationUseCase(new DrizzleUnitOfWork(database), budget);
 }, 120_000);
 
 afterAll(async () => {

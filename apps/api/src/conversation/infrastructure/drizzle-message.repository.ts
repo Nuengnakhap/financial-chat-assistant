@@ -185,6 +185,11 @@ async function insertOnce(db: DbOrTx, message: AppendMessage): Promise<StoredMes
       role: message.role,
       parts: message.parts,
       status: message.status,
+      // Both halves or neither, which `chk_reservation_is_whole` insists on:
+      // half a claim cannot be given back, and the half that would be missing
+      // is the one that says which window to give it back to.
+      reservationId: message.reservation?.id ?? null,
+      reservationWindow: message.reservation?.windowStart ?? null,
       seq: sql`(SELECT COALESCE(MAX(${messages.seq}), 0) + 1 FROM ${messages} WHERE ${messages.conversationId} = ${message.conversationId})`,
     })
     .returning(COLUMNS);

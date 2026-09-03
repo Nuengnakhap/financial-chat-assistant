@@ -5,6 +5,7 @@ import type {
   MessageId,
   MessageStatus,
   OwnerScope,
+  Reservation,
 } from '@fca/domain';
 
 import type { MessageCursor, Page, PageRequest } from '../pagination';
@@ -19,6 +20,12 @@ export interface AppendMessage {
   readonly role: 'user' | 'assistant';
   readonly parts: readonly unknown[];
   readonly status: MessageStatus;
+  /**
+   * The claim on the asker's budget that this answer will be charged against.
+   * Written with the row rather than after it, so no generation can exist for a
+   * moment without the thing that has to be given back when it ends.
+   */
+  readonly reservation?: Reservation | undefined;
 }
 
 export interface StoredMessage {
