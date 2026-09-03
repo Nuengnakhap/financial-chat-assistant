@@ -24,6 +24,8 @@ export interface AppConfig {
     /** Converted to `MicroUsd` exactly once, by the budget module. */
     readonly limitUsd: number;
     readonly windowSeconds: number;
+    /** `null` when the prices compiled in are the ones to use. */
+    readonly pricingPath: string | null;
   };
   readonly auth: {
     readonly jwtSecret: string;
@@ -60,6 +62,18 @@ export type EnvSource = Readonly<Record<string, string | undefined>>;
  * Throws rather than returning a `Result`: a misconfigured environment is a
  * deployment bug, and the only correct response is to stop before serving.
  */
+/**
+ * Split out for no reason but length: a function that has to be scrolled is one
+ * whose shape nobody can see, and the lint rule saying so is the point of it.
+ */
+function usageOf(env: Env): AppConfig['usage'] {
+  return {
+    limitUsd: env.USAGE_LIMIT_USD,
+    windowSeconds: env.USAGE_WINDOW_SECONDS,
+    pricingPath: env.PRICING_PATH,
+  };
+}
+
 export function loadConfig(source: EnvSource): AppConfig {
   const parsed = envSchema.safeParse(source);
   if (!parsed.success) {
@@ -90,7 +104,7 @@ function toAppConfig(env: Env): AppConfig {
       maxOutputTokens: env.LLM_MAX_OUTPUT_TOKENS,
       requestTimeoutMs: env.LLM_REQUEST_TIMEOUT_MS,
     },
-    usage: { limitUsd: env.USAGE_LIMIT_USD, windowSeconds: env.USAGE_WINDOW_SECONDS },
+    usage: usageOf(env),
     auth: {
       jwtSecret: env.JWT_SECRET,
       accessTokenTtlMs: env.ACCESS_TOKEN_TTL,

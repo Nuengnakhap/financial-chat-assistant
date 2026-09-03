@@ -71,6 +71,13 @@ export const envSchema = z.object({
   // Capped far below 2^53 micro-USD so the conversion to MicroUsd stays exact.
   USAGE_LIMIT_USD: decimal(0.000_001, 1_000_000),
   USAGE_WINDOW_SECONDS: wholeNumber(1, 2_678_400).default(3_600),
+  /**
+   * A JSON file of model prices, for a deployment whose endpoint is not priced
+   * in the table shipped here. Prices move on somebody else's schedule, and
+   * needing a release to follow one is how a limit comes to be enforced at last
+   * month's rates.
+   */
+  PRICING_PATH: z.string().min(1).nullable().default(null),
 
   JWT_SECRET: z.string().min(32, 'must be at least 32 characters'),
   // `prefault` not `default`: the fallback is the text a person writes, and it
