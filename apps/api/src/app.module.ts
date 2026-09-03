@@ -3,8 +3,18 @@ import { Global, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 
 import { TaskRegistry } from './bootstrap/task-registry';
+import { MODEL_IN_USE, type ModelInUse } from './budget/application/ports/model-in-use.port';
+import { ReserveBudgetUseCase } from './budget/application/use-cases/reserve-budget.use-case';
+import { SettleUsageUseCase } from './budget/application/use-cases/settle-usage.use-case';
+import { BudgetModule } from './budget/budget.module';
+import {
+  GENERATION_BUDGET,
+  type GenerationBudget,
+} from './conversation/application/ports/budget.port';
 import { ConversationModule } from './conversation/conversation.module';
 import { ConversationDeletionSubscriber } from './conversation/infrastructure/conversation-deletion.subscriber';
+import { LlmCapabilityService } from './generation/application/llm-capability.service';
+import { USAGE_SETTLEMENT, type UsageSettlement } from './generation/application/ports/budget.port';
 import { GenerationModule } from './generation/generation.module';
 import { GenerationSubscriber } from './generation/infrastructure/generation.subscriber';
 import { IdentityModule } from './identity/identity.module';
@@ -40,6 +50,7 @@ import { RedisService } from './shared/redis/redis.service';
     FinancialModule,
     CpuModule,
     IdentityModule,
+    BudgetModule,
     ConversationModule,
     GenerationModule,
     QueueModule,
@@ -88,8 +99,47 @@ import { RedisService } from './shared/redis/redis.service';
       ): readonly DomainEventHandler[] => [deletion, generation],
       inject: [ConversationDeletionSubscriber, GenerationSubscriber],
     },
+    // The two contexts that spend a budget each declare their own narrow view
+    // of one, and neither knows the other or the context that implements it.
+    // This is where the three meet, which is the only place that has to change
+    // if a budget ever comes from somewhere else.
+    { provide: GENERATION_BUDGET, useExisting: ReserveBudgetUseCase },
+    { provide: USAGE_SETTLEMENT, useExisting: SettleUsageUseCase },
+    // Which way this one points is the whole reason it exists: the budget has
+    // to put a price on a question before it is asked, and only the thing that
+    // talks to the endpoint knows what a router resolved `auto` to.
+    { provide: MODEL_IN_USE, useExisting: LlmCapabilityService },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
   ],
-  exports: [APP_CONFIG, AppLogger, ReadinessProbe, TaskRegistry, DOMAIN_EVENT_HANDLERS],
+  exports: [
+    APP_CONFIG,
+    AppLogger,
+    ReadinessProbe,
+    TaskRegistry,
+    DOMAIN_EVENT_HANDLERS,
+    GENERATION_BUDGET,
+    USAGE_SETTLEMENT,
+    MODEL_IN_USE,
+  ],
 })
 export class AppModule {}
+
+/**
+ * A `useExisting` binding is two names and a hope. Nothing above checks that
+ * the class on one side has the methods the port on the other side declares —
+ * it is resolved by token at runtime, so a rename turns into `is not a
+ * function` at the moment somebody asks a question.
+ *
+ * These make it a build failure instead, the same way `ApiErrorCode` is held to
+ * cover every `DomainErrorCode`.
+ */
+type Assert<T extends true> = T;
+type _ReserverIsTheBudgetAConversationAsksFor = Assert<
+  ReserveBudgetUseCase extends GenerationBudget ? true : false
+>;
+type _SettlerIsTheBudgetAGenerationAsksFor = Assert<
+  SettleUsageUseCase extends UsageSettlement ? true : false
+>;
+type _CapabilityCheckKnowsWhichModelAnswers = Assert<
+  LlmCapabilityService extends ModelInUse ? true : false
+>;
