@@ -19,6 +19,7 @@ import { testConfig } from '../../shared/config/__tests__/test-config';
 import { APP_CONFIG } from '../../shared/config/app-config.token';
 import { DomainErrorFilter } from '../../shared/http/domain-error.filter';
 import { AppLogger, createPinoLogger } from '../../shared/observability/app-logger';
+import { Counters } from '../../shared/observability/counters';
 import { startHarness, type Harness } from '../../shared/persistence/__tests__/harness';
 import {
   conversations,
@@ -81,6 +82,10 @@ const budget: GenerationBudget = {
     },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
     TaskRegistry,
+    // Global in the composition root, so anything that counts can be built
+    // wherever it is needed. A module that stands part of the app up has to
+    // provide it too, or the send throttle cannot be constructed.
+    Counters,
     // The same list the composition root builds, for the same reason.
     {
       provide: DOMAIN_EVENT_HANDLERS,
@@ -90,7 +95,14 @@ const budget: GenerationBudget = {
       inject: [ConversationDeletionSubscriber],
     },
   ],
-  exports: [APP_CONFIG, AppLogger, TaskRegistry, DOMAIN_EVENT_HANDLERS, GENERATION_BUDGET],
+  exports: [
+    APP_CONFIG,
+    AppLogger,
+    TaskRegistry,
+    Counters,
+    DOMAIN_EVENT_HANDLERS,
+    GENERATION_BUDGET,
+  ],
 })
 class DeletionPipelineModule {}
 

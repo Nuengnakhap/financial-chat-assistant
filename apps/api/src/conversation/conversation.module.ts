@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { IdentityModule } from '../identity/identity.module';
+import { SEND_THROTTLE } from './application/ports/send-throttle.port';
 import { CreateConversationUseCase } from './application/use-cases/create-conversation.use-case';
 import { DescribeConversationUseCase } from './application/use-cases/describe-conversation.use-case';
 import { ListConversationsUseCase } from './application/use-cases/list-conversations.use-case';
@@ -9,11 +10,13 @@ import { PurgeConversationUseCase } from './application/use-cases/purge-conversa
 import { RemoveConversationUseCase } from './application/use-cases/remove-conversation.use-case';
 import { StartGenerationUseCase } from './application/use-cases/start-generation.use-case';
 import { ConversationDeletionSubscriber } from './infrastructure/conversation-deletion.subscriber';
+import { RedisSendThrottle } from './infrastructure/redis-send-throttle';
 import { ConversationController } from './presentation/conversation.controller';
 import { ConversationsController } from './presentation/conversations.controller';
 import { MessagesController } from './presentation/messages.controller';
 import { SessionGuard } from '../shared/http/session.guard';
 import { PersistenceModule } from '../shared/persistence/persistence.module';
+import { RedisModule } from '../shared/redis/redis.module';
 
 /**
  * `IdentityModule` is imported for one thing: `SessionGuard` is built in the
@@ -22,7 +25,7 @@ import { PersistenceModule } from '../shared/persistence/persistence.module';
  * share the database through `UnitOfWork` and say nothing else to each other.
  */
 @Module({
-  imports: [PersistenceModule, IdentityModule],
+  imports: [PersistenceModule, IdentityModule, RedisModule],
   controllers: [ConversationsController, ConversationController, MessagesController],
   providers: [
     ListConversationsUseCase,
@@ -33,6 +36,7 @@ import { PersistenceModule } from '../shared/persistence/persistence.module';
     RemoveConversationUseCase,
     PurgeConversationUseCase,
     ConversationDeletionSubscriber,
+    { provide: SEND_THROTTLE, useClass: RedisSendThrottle },
     SessionGuard,
   ],
   // The composition root builds the handler list; this is the one this context

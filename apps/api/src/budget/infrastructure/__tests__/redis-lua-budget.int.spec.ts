@@ -58,7 +58,7 @@ function storeWith(limitUsd = LIMIT_USD, windowSeconds = 3_600): RedisLuaBudgetS
   const config: AppConfig = {
     ...testConfig(),
     redis: { url: url() },
-    usage: { limitUsd, windowSeconds, pricingPath: null },
+    usage: { limitUsd, windowSeconds, pricingPath: null, sendsPerMinute: 6 },
   };
 
   return new RedisLuaBudgetStore(redis, ledger, config);
@@ -293,7 +293,7 @@ describe('a counter Redis has forgotten', () => {
     const store = new RedisLuaBudgetStore(redis, counting, {
       ...testConfig(),
       redis: { url: url() },
-      usage: { limitUsd: LIMIT_USD, windowSeconds: 3_600, pricingPath: null },
+      usage: { limitUsd: LIMIT_USD, windowSeconds: 3_600, pricingPath: null, sendsPerMinute: 6 },
     });
 
     await store.read(ADA);

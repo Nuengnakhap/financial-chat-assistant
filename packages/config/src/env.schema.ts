@@ -72,6 +72,13 @@ export const envSchema = z.object({
   USAGE_LIMIT_USD: decimal(0.000_001, 1_000_000),
   USAGE_WINDOW_SECONDS: wholeNumber(1, 2_678_400).default(3_600),
   /**
+   * How many questions one person may send in a minute. The budget is what
+   * stops a costly conversation; this is what stops a cheap one arriving ten
+   * thousand times, which the budget would not notice until it had paid for it.
+   * Six is comfortably more than a person reading answers can produce.
+   */
+  SENDS_PER_MINUTE: wholeNumber(1, 600).default(6),
+  /**
    * A JSON file of model prices, for a deployment whose endpoint is not priced
    * in the table shipped here. Prices move on somebody else's schedule, and
    * needing a release to follow one is how a limit comes to be enforced at last

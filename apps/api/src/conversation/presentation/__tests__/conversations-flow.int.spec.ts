@@ -18,6 +18,7 @@ import { testConfig } from '../../../shared/config/__tests__/test-config';
 import { APP_CONFIG } from '../../../shared/config/app-config.token';
 import { DomainErrorFilter } from '../../../shared/http/domain-error.filter';
 import { AppLogger, createPinoLogger } from '../../../shared/observability/app-logger';
+import { Counters } from '../../../shared/observability/counters';
 import { startHarness, type Harness } from '../../../shared/persistence/__tests__/harness';
 import { conversations, outboxEvents } from '../../../shared/persistence/schema';
 import { GENERATION_BUDGET, type GenerationBudget } from '../../application/ports/budget.port';
@@ -69,8 +70,11 @@ const budget: GenerationBudget = {
     },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
     TaskRegistry,
+    // Global in the composition root; a module that stands part of the app up
+    // has to provide it too, or the send throttle cannot be constructed.
+    Counters,
   ],
-  exports: [APP_CONFIG, AppLogger, TaskRegistry, GENERATION_BUDGET],
+  exports: [APP_CONFIG, AppLogger, TaskRegistry, Counters, GENERATION_BUDGET],
 })
 class ConversationFlowModule {}
 

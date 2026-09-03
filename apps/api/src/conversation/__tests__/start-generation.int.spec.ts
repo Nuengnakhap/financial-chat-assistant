@@ -21,6 +21,7 @@ import { DatabaseService } from '../../shared/persistence/database.service';
 import { DrizzleUnitOfWork } from '../../shared/persistence/drizzle-unit-of-work';
 import { conversations, messages, outboxEvents } from '../../shared/persistence/schema';
 import type { GenerationBudget } from '../application/ports/budget.port';
+import type { SendThrottle } from '../application/ports/send-throttle.port';
 import { StartGenerationUseCase } from '../application/use-cases/start-generation.use-case';
 
 /**
@@ -66,7 +67,10 @@ let room: ConversationId;
 beforeAll(async () => {
   harness = await startHarness();
   database = new DatabaseService(integrationConfig());
-  start = new StartGenerationUseCase(new DrizzleUnitOfWork(database), budget);
+  // Allowed always: what this file is about is the transaction, and a burst
+  // limit is proven against a real Redis beside the adapter that holds it.
+  const throttle: SendThrottle = { recordSend: async () => await Promise.resolve(Ok(undefined)) };
+  start = new StartGenerationUseCase(new DrizzleUnitOfWork(database), budget, throttle);
 }, 120_000);
 
 afterAll(async () => {

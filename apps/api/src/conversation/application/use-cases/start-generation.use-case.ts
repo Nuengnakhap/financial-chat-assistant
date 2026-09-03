@@ -27,6 +27,7 @@ import {
 import { conversationGone } from '../conversation-id';
 import { GENERATION_BUDGET, type GenerationBudget } from '../ports/budget.port';
 import type { StoredMessage } from '../ports/message.repository';
+import { SEND_THROTTLE, type SendThrottle } from '../ports/send-throttle.port';
 
 export interface StartGeneration {
   readonly conversationId: ConversationId;
@@ -70,6 +71,7 @@ export class StartGenerationUseCase {
   constructor(
     @Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork,
     @Inject(GENERATION_BUDGET) private readonly budget: GenerationBudget,
+    @Inject(SEND_THROTTLE) private readonly throttle: SendThrottle,
   ) {}
 
   async execute(
@@ -81,6 +83,13 @@ export class StartGenerationUseCase {
     // string — sanitising further downstream would make the question a person
     // sees differ from the one that was answered.
     const asked = { ...sent, content: asModelSafeText(sent.content) };
+
+    // First of the three refusals, because it is the cheapest and because the
+    // expensive part of a burst happens before a single token is bought: every
+    // send writes two rows and an outbox event. A limit checked after that has
+    // already let the flood through.
+    const allowed = await this.throttle.recordSend(scope.userId);
+    if (isErr(allowed)) return allowed;
 
     // Before the transaction, because it is not a database write and cannot
     // join one — and before the question is stored, because a question written

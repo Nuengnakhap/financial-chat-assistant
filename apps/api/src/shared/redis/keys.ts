@@ -38,6 +38,12 @@ export const K = {
   authThrottleIp: (ipHash: string): RedisKey => key(`thr:auth:ip:{${ipHash.slice(0, 32)}}`),
   /** Separate from the sign-in counter: one must not be able to exhaust the other. */
   registrationThrottleIp: (ipHash: string): RedisKey => key(`thr:reg:ip:{${ipHash.slice(0, 32)}}`),
+  /**
+   * How often somebody has asked, counted per person. Not per address: this
+   * system has no edge, so an address here belongs to a proxy, and a signed-in
+   * user is the only actor it can name.
+   */
+  sendThrottle: (userId: UserId): RedisKey => key(`thr:send:{${userId}}`),
 } as const;
 
 /**

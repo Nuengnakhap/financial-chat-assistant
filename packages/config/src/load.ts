@@ -26,6 +26,8 @@ export interface AppConfig {
     readonly windowSeconds: number;
     /** `null` when the prices compiled in are the ones to use. */
     readonly pricingPath: string | null;
+    /** Questions per minute per person — a burst limit, not a spending one. */
+    readonly sendsPerMinute: number;
   };
   readonly auth: {
     readonly jwtSecret: string;
@@ -71,6 +73,7 @@ function usageOf(env: Env): AppConfig['usage'] {
     limitUsd: env.USAGE_LIMIT_USD,
     windowSeconds: env.USAGE_WINDOW_SECONDS,
     pricingPath: env.PRICING_PATH,
+    sendsPerMinute: env.SENDS_PER_MINUTE,
   };
 }
 
