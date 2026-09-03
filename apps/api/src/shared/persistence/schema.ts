@@ -186,7 +186,17 @@ export const messages = pgTable(
     verification: jsonb(),
     model: text(),
     inputTokens: integer('input_tokens').notNull().default(0),
+    /** Of the input, how many the provider served from its own cache and charged less for. */
+    cachedInputTokens: integer('cached_input_tokens').notNull().default(0),
     outputTokens: integer('output_tokens').notNull().default(0),
+    /**
+     * The claim held on the asker's budget while this answer is written, and the
+     * window it belongs to. On the row rather than in the process that made it,
+     * because whatever ends a generation has to give it back — and the thing
+     * that ends one whose pod died is a janitor that never saw the request.
+     */
+    reservationId: uuid('reservation_id'),
+    reservationWindow: instant('reservation_window'),
     /**
      * Integer micro-USD, read back as a bigint. No float touches this column.
      * The default is written as SQL because drizzle-kit cannot serialise a
@@ -223,6 +233,53 @@ export const messages = pgTable(
       .on(table.conversationId)
       .where(sql`${table.status} = 'generating'`),
     index('idx_messages_created').on(table.createdAt),
+    // G2: a claim is either whole or absent. Half of one cannot be given back,
+    // and the half that is missing is always the one needed to find it.
+    check(
+      'chk_reservation_is_whole',
+      sql`(${table.reservationId} IS NULL) = (${table.reservationWindow} IS NULL)`,
+    ),
+  ],
+);
+
+/**
+ * What has been spent, and the record that outlives the answer that spent it.
+ *
+ * Redis holds the counter a limit is enforced by; this is where the counter is
+ * rebuilt from when Redis has been restarted, and the reason a window survives
+ * that at all. It is a ledger, so nothing here is ever updated — a row is one
+ * generation, once.
+ */
+export const usageEvents = pgTable(
+  'usage_events',
+  {
+    id: bigserial({ mode: 'bigint' }).primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * Deliberately not a foreign key. Deleting a conversation deletes its
+     * messages, and money already spent must not go with them — otherwise
+     * deleting a conversation is how somebody gives themselves their quota
+     * back, and the rebuilt total is lower than the truth.
+     */
+    messageId: uuid('message_id').notNull(),
+    windowStart: instant('window_start').notNull(),
+    model: text().notNull(),
+    inputTokens: integer('input_tokens').notNull(),
+    cachedInputTokens: integer('cached_input_tokens').notNull(),
+    outputTokens: integer('output_tokens').notNull(),
+    costMicroUsd: bigint('cost_micro_usd', { mode: 'bigint' }).notNull(),
+    createdAt: instant('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    // B1: one generation is charged once. A second write is the constraint
+    // speaking rather than a second row, which is what makes recording it from
+    // more than one place safe.
+    unique('uq_usage_message').on(table.messageId),
+    check('chk_usage_cost_not_negative', sql`${table.costMicroUsd} >= 0`),
+    // The rebuild reads exactly this: one person, one window.
+    index('idx_usage_user_window').on(table.userId, table.windowStart),
   ],
 );
 
@@ -261,6 +318,7 @@ export const outboxEvents = pgTable(
   ],
 );
 
+export type UsageEventRow = typeof usageEvents.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type SessionTokenRow = typeof sessionTokens.$inferSelect;
