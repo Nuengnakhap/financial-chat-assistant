@@ -6,6 +6,11 @@ import type { ChatCompletionChunk, ChatCompletionCreateParamsStreaming } from 'o
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { AppLogger, createPinoLogger } from '../../../shared/observability/app-logger';
+import {
+  llmGatewayContract,
+  type GatewayHarness,
+  type ProviderScript,
+} from '../../application/ports/__tests__/llm-gateway.contract';
 import type { CompletionChunk, CompletionRequest } from '../../application/ports/llm-gateway.port';
 import { QUERY_TOOL } from '../../application/prompt.factory';
 import { OpenAiLlmGateway, type CompletionsApi } from '../openai-llm.gateway';
@@ -164,6 +169,75 @@ function capturing(): { readonly logger: AppLogger; text: () => string } {
     text: () => written.join(''),
   };
 }
+
+/**
+ * Everything the port promises, asked of the adapter that is actually deployed.
+ *
+ * The script arrives in words no provider uses and is laid out here the way
+ * this one sends it: arguments in fragments identified by position, and the
+ * usage report last, in a chunk with no choices in it at all. The same suite
+ * runs against a provider that does the opposite, beside the port.
+ */
+function toOpenAi(script: ProviderScript): ChatCompletionChunk[] {
+  const chunks: ChatCompletionChunk[] = (script.text ?? []).map(delta);
+
+  for (const [index, call] of (script.calls ?? []).entries()) {
+    const [first = '', ...rest] = call.fragments;
+    chunks.push(toolCall({ index, id: call.id, name: call.name, args: first }));
+    for (const fragment of rest) chunks.push(toolCall({ index, args: fragment }));
+  }
+
+  const why = script.finish;
+  if (why !== undefined && why !== null) chunks.push(stopping(why));
+  // Last, which is where `stream_options.include_usage` puts it.
+  const reported = script.usage;
+  if (reported !== undefined && reported !== null) chunks.push(reporting(reported));
+
+  return chunks;
+}
+
+/** As `stop`, but for the reasons a provider can invent that we do not know. */
+function stopping(reason: string): ChatCompletionChunk {
+  return {
+    id: 'c',
+    created: 0,
+    model: 'm',
+    object: 'chat.completion.chunk',
+    choices: [{ index: 0, delta: {}, finish_reason: reason }],
+  } as ChatCompletionChunk;
+}
+
+function reporting(reported: NonNullable<ProviderScript['usage']>): ChatCompletionChunk {
+  return {
+    id: 'c',
+    created: 0,
+    model: reported.model,
+    object: 'chat.completion.chunk',
+    choices: [],
+    usage: {
+      prompt_tokens: reported.promptTokens,
+      completion_tokens: reported.completionTokens,
+      total_tokens: reported.promptTokens + reported.completionTokens,
+      prompt_tokens_details: { cached_tokens: reported.cachedPromptTokens },
+    },
+  };
+}
+
+llmGatewayContract('openai protocol', (): GatewayHarness => {
+  const silent = capturing().logger;
+
+  return {
+    asks: CONFIG.llm.model,
+    answering: (script) =>
+      new OpenAiLlmGateway(CONFIG, fakeCompletions(toOpenAi(script)).api, silent),
+    failing: (error) => {
+      const refusing = fakeCompletions([]);
+      refusing.failWith = error;
+
+      return new OpenAiLlmGateway(CONFIG, refusing.api, silent);
+    },
+  };
+});
 
 let fake: FakeCompletions;
 let logs: ReturnType<typeof capturing>;

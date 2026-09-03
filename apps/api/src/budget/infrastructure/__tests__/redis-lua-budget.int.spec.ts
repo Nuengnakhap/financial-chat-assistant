@@ -8,6 +8,7 @@ import { delay } from '../../../shared/async/timeouts';
 import { testConfig } from '../../../shared/config/__tests__/test-config';
 import { AppLogger, createPinoLogger } from '../../../shared/observability/app-logger';
 import { RedisService } from '../../../shared/redis/redis.service';
+import { budgetStoreContract } from '../../application/ports/__tests__/budget.store.contract';
 import type { UsageLedger } from '../../application/ports/usage-ledger.port';
 import { RedisLuaBudgetStore } from '../redis-lua-budget.store';
 
@@ -85,6 +86,14 @@ afterAll(async () => {
   await redis.onModuleDestroy();
   await admin.quit();
 });
+
+/**
+ * Everything the port promises, asked of the adapter that is actually deployed.
+ * The suite is shared with the in-memory implementation beside the port, so a
+ * sentence that only holds because of how the Lua happens to be written fails
+ * there rather than becoming the contract.
+ */
+budgetStoreContract('redis lua', () => ({ store: storeWith(), limit: usd(LIMIT_USD) }));
 
 describe('holding a claim on a budget', () => {
   it('grants what fits and refuses what does not', async () => {

@@ -10,6 +10,7 @@ import { AppLogger, createPinoLogger } from '../../../shared/observability/app-l
 import { K } from '../../../shared/redis/keys';
 import { RedisService } from '../../../shared/redis/redis.service';
 import { StreamMultiplexer } from '../../../shared/redis/stream-multiplexer';
+import { generationEventsContract } from '../../application/ports/__tests__/generation-events.contract';
 import {
   STREAM_START,
   type StoredStreamEvent,
@@ -78,6 +79,14 @@ const typesOf = (events: readonly StoredStreamEvent[]) =>
   events.map((stored) =>
     stored.event.type === 'text_delta' ? stored.event.delta : stored.event.type,
   );
+
+/**
+ * Everything the port promises, asked of the adapter that is actually deployed.
+ * The suite is shared with the in-memory implementation next to the port, so a
+ * sentence that only holds because of how Redis happens to behave fails there
+ * rather than being written into the contract.
+ */
+generationEventsContract('redis', () => stream);
 
 describe('attaching to a generation that has already finished', () => {
   it('replays all of it and ends, without waiting for anything live', async () => {
