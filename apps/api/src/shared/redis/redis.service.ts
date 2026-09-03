@@ -171,12 +171,17 @@ export class RedisService implements OnModuleDestroy, HealthIndicator {
   }
 
   async onModuleDestroy(): Promise<void> {
-    // quit() drains in-flight replies, but it is a command: a client that never
-    // connected would have to connect in order to send it.
-    if (this.client.status === 'wait' || this.client.status === 'end') {
+    // `quit()` drains in-flight replies, and it is worth waiting for exactly
+    // one state: `ready`. Anywhere else there is nothing in flight to drain and
+    // `quit()` is a command waiting for a connection — one that never came
+    // (`wait`), one still being negotiated (`connecting`), or one being
+    // negotiated again through an outage (`reconnecting`). Shutdown is on a
+    // clock, so the socket goes instead.
+    if (this.client.status !== 'ready') {
       this.client.disconnect();
       return;
     }
+
     await this.client.quit();
   }
 }

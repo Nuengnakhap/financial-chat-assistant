@@ -504,7 +504,13 @@ task that is still writing loses the write. The order is driven explicitly from
 round, so `enableShutdownHooks()` is deliberately not used.
 
 Every step of it is bounded, and the total is chosen to fit inside a 30-second
-grace period. `server.close()` waits for requests already in flight, with no
+grace period. Releasing the modules has no bound of its own because each
+`onModuleDestroy` carries one — which is a rule with a scar: BullMQ's
+connections retry forever, as BullMQ requires, so closing its worker and its
+queue used to wait for a Redis that was not coming back. Both are bounded now,
+and dropping the socket is what makes the abandoned close settle. `quit()` on
+the shared client is only awaited when it is `ready`, for the same reason: it is
+a command, and anywhere else there is nothing in flight to drain. `server.close()` waits for requests already in flight, with no
 limit of its own — one connection that never finishes would hold the sequence
 before the steps that release anything, and the process would be killed partway
 through rather than stopping. So connections that outstay the grace are cut,

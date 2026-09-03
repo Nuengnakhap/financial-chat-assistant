@@ -60,6 +60,13 @@ export const DEFAULT_SHUTDOWN_TIMINGS: ShutdownTimings = {
  * Every step is bounded. A shutdown that any one client or task can hold open
  * forever gets killed partway through instead, which is the outcome the order
  * above exists to avoid.
+ *
+ * `release()` has no bound of its own on purpose: it destroys the modules, and
+ * each `onModuleDestroy` is responsible for its own clock. That is not a
+ * formality — both BullMQ connections retry forever because BullMQ requires it
+ * to, so an unbounded `close()` there once made this last step wait for a Redis
+ * that was never coming back. A module that can wait forever is a bug in that
+ * module, and it is testable there without a shutdown around it.
  */
 export async function runShutdown({
   target,
