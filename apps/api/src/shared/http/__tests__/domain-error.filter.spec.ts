@@ -197,8 +197,8 @@ describe('a rate limit tells the caller how long to wait', () => {
 });
 
 /**
- * Set by hand rather than by a plugin, so they are checked by hand too. Four
- * headers on an API that answers JSON and SSE, and one of them is here twice on
+ * Set by hand rather than by a plugin, so they are checked by hand too. Five
+ * headers on an API that answers JSON and SSE, and framing is refused twice on
  * purpose — for browsers that read CSP and for the rest.
  */
 describe('the headers every response carries', () => {
@@ -215,6 +215,15 @@ describe('the headers every response carries', () => {
 
   it('keeps a conversation id out of the referrer of whatever a page links to', async () => {
     expect((await call('/boom/not-found')).headers['referrer-policy']).toBe('same-origin');
+  });
+
+  it('refuses to be read as a subresource by another site', async () => {
+    // `X-Frame-Options` covers a frame; this covers the rest of the ways one
+    // page pulls in another's bytes — an `<img>` or a `<script>` pointed at an
+    // endpoint that answers with somebody's conversation.
+    expect((await call('/boom/not-found')).headers['cross-origin-resource-policy']).toBe(
+      'same-origin',
+    );
   });
 
   it('does not promise anything about TLS it is in no position to know', async () => {

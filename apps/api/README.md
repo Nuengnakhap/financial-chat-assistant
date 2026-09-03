@@ -411,10 +411,12 @@ came from our own script. The check applies whenever a session cookie is
 present rather than to a list of routes — a list is a thing to forget when the
 next endpoint lands.
 
-Every answer carries four headers, set in `bootstrap/fastify.ts` and asserted in
+Every answer carries five headers, set in `bootstrap/fastify.ts` and asserted in
 `domain-error.filter.spec.ts`: a CSP of `default-src 'none'; frame-ancestors
-'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and
-`Referrer-Policy: same-origin`. This process answers JSON and SSE, so the policy
+'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: same-origin` and `Cross-Origin-Resource-Policy: same-origin`
+— framing is refused twice, once for browsers that read a CSP and once for the
+rest, and the last one covers the other ways one page pulls in another's bytes. This process answers JSON and SSE, so the policy
 is the strict one — nothing here is meant to be rendered, and a JSON body a
 browser is willing to sniff into HTML is how one gets rendered anyway. There is
 no `Strict-Transport-Security`: TLS belongs to whatever terminates it in front
