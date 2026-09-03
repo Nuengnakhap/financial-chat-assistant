@@ -6,6 +6,16 @@ packages:
 # Nothing enters the tree before a takeover would have been noticed and yanked.
 minimumReleaseAge: 4320 # 3 days, in minutes
 
+# Nest pins `fastify` to an exact version, so a patched fastify never reaches
+# the server through the adapter that runs it — the app's own dependency is a
+# second copy that nothing serves requests with. Two advisories (GHSA-w2qp-rph6-63g4
+# schema-validation bypass, GHSA-3m5p-2c4r-xxw2 X-Forwarded spoofing) are fixed
+# in 5.12.1. Neither is reachable here — validation is zod through `ZodPayload`
+# and `trustProxy` is never set — which is the reason this is an override rather
+# than an emergency, and not a reason to keep a version with a known hole in it.
+overrides:
+  fastify: 5.12.1
+
 # Each entry is a decision, not a default. A postinstall runs arbitrary code on
 # the machine that installs, so the ones allowed here are the ones something
 # genuinely stops working without.

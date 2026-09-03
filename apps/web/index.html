@@ -7,6 +7,30 @@
          404. A console that is never empty is a console nobody reads. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Financial Chat Assistant</title>
+    <!-- The page's own policy, in the page, because in this project nothing
+         serves it: Vite serves it in development and a static host would serve
+         it in production, and a meta tag is the one place both read. `'self'`
+         throughout because everything — script, style, font, the API — comes
+         from this origin through the dev proxy.
+
+         The one inline script is allowed by its hash rather than by
+         `'unsafe-inline'`, which would allow every other one too. A test
+         recomputes the hash from this file, so editing the script below fails
+         the build instead of silently turning the theme restore off.
+
+         `'unsafe-inline'` remains for style, and only for style: the chart
+         library writes inline styles as it draws.
+
+         No `frame-ancestors`: a browser ignores it in a meta tag and says so in
+         the console on every load, which is how a console stops being read. It
+         only works as a response header, and the thing that would send one is
+         whatever serves this file — Vite in development, a static host in
+         production, neither of which is in this repository. The API sends its
+         own, for its own responses. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'sha256-0Q7acuV4zJLA2s6mEUkUOjaKYD6a5C1YIB6vGkD0ews='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'"
+    />
     <!-- Light is the default, so this only has to restore a stored choice of
          dark — and it has to run before the first paint, or everyone who chose
          dark sees a white flash on every load. The key is asserted against

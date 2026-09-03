@@ -26,7 +26,7 @@
     "bullmq": "^6.3.0",
     "drizzle-orm": "0.45.2",
     "fast-jwt": "^6.3.2",
-    "fastify": "5.11.3",
+    "fastify": "5.12.1",
     "gpt-tokenizer": "^4.0.0",
     "ioredis": "^6.0.0",
     "openai": "^7.8.0",

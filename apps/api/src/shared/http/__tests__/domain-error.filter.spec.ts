@@ -196,6 +196,36 @@ describe('a rate limit tells the caller how long to wait', () => {
   });
 });
 
+/**
+ * Set by hand rather than by a plugin, so they are checked by hand too. Four
+ * headers on an API that answers JSON and SSE, and one of them is here twice on
+ * purpose — for browsers that read CSP and for the rest.
+ */
+describe('the headers every response carries', () => {
+  it('says a browser may load nothing at all from what this returns', async () => {
+    const { headers } = await call('/boom/not-found');
+
+    expect(headers['content-security-policy']).toBe("default-src 'none'; frame-ancestors 'none'");
+    expect(headers['x-frame-options']).toBe('DENY');
+  });
+
+  it('says a JSON body is a JSON body, whatever a browser guesses', async () => {
+    expect((await call('/boom/not-found')).headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('keeps a conversation id out of the referrer of whatever a page links to', async () => {
+    expect((await call('/boom/not-found')).headers['referrer-policy']).toBe('same-origin');
+  });
+
+  it('does not promise anything about TLS it is in no position to know', async () => {
+    // `Strict-Transport-Security` belongs to the terminator in front of this
+    // process, which is the thing that knows whether TLS is on. Sent from here
+    // over plain HTTP it is ignored by browsers and reads, to anyone auditing,
+    // as though the question had been answered.
+    expect((await call('/boom/not-found')).headers['strict-transport-security']).toBeUndefined();
+  });
+});
+
 describe('correlation', () => {
   it('returns the request id in both the header and the body', async () => {
     const response = await call('/boom/not-found');
