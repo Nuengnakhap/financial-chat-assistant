@@ -45,6 +45,7 @@ export {
   budgetSnapshot,
   isTerminalStreamEvent,
   parseStreamEvent,
+  remainingMicroUsd,
   streamEvent,
   type BudgetSnapshot,
   type StreamEvent,

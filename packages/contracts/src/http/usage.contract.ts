@@ -1,18 +1,15 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 
-import { isoDateTime, microUsd } from '../primitives';
+import { microUsd } from '../primitives';
+import { budgetSnapshot } from '../sse/stream-events.contract';
 
 /**
  * The same numbers the SSE `usage` event carries, so a page that never opened a
- * stream and one that did agree. All amounts are micro-USD strings.
+ * stream and one that did agree — and one more that is only a subtraction of
+ * them, so nothing has to do it twice. All amounts are micro-USD strings.
  */
-export const usageView = z.object({
-  spentMicroUsd: microUsd,
-  reservedMicroUsd: microUsd,
-  limitMicroUsd: microUsd,
+export const usageView = budgetSnapshot.extend({
   remainingMicroUsd: microUsd,
-  resetAt: isoDateTime,
-  exceeded: z.boolean(),
 });
 
 export const usageContract = {

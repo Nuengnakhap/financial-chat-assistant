@@ -16,7 +16,34 @@ export const budgetSnapshot = z.object({
   reservedMicroUsd: microUsd,
   limitMicroUsd: microUsd,
   resetAt: isoDateTime,
+  /**
+   * Another answer will not fit. Not the same as "nothing left": a generation
+   * holds what it might cost before it starts, so a window with a fraction of a
+   * cent in it is spent for every practical purpose — and only the server knows
+   * what the next one would hold.
+   */
+  exceeded: z.boolean(),
 });
+
+/**
+ * What is left of a window, worked out in one place.
+ *
+ * The stream carries three figures and the HTTP view carries four, and the
+ * fourth is the other three subtracted. Written here rather than on either side
+ * so that a meter fed by an event and a meter fed by a page load cannot
+ * disagree — and never below zero, because a window that settled past its limit
+ * has nothing left rather than a debt.
+ *
+ * What is held counts as gone: a reservation is money that cannot be spent on
+ * anything else, and calling it available offers room the next question would
+ * be refused for.
+ */
+export function remainingMicroUsd(budget: BudgetSnapshot): string {
+  const left =
+    BigInt(budget.limitMicroUsd) - BigInt(budget.spentMicroUsd) - BigInt(budget.reservedMicroUsd);
+
+  return (left < 0n ? 0n : left).toString();
+}
 
 export const streamEvent = z.discriminatedUnion('type', [
   z.object({

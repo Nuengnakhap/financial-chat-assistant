@@ -75,6 +75,7 @@ describe('money on the wire', () => {
         reservedMicroUsd: '0',
         limitMicroUsd: '1000000',
         resetAt: '2026-08-29T12:00:00.000Z',
+        exceeded: false,
       },
     });
 
