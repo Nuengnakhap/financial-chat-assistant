@@ -99,6 +99,14 @@ export class FinancialQueryPool implements OnModuleDestroy, HealthIndicator {
       connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
       types: { getTypeParser: () => keepAsText },
     });
+    // Without this, Postgres going away takes the process with it: a `pg` pool
+    // emits `error` for a connection that dies while idle, and `error` with no
+    // listener ends a Node process. Found by stopping Postgres under a running
+    // API, which is what `pnpm drill postgres` does.
+    this.pool.on('error', (error: Error) => {
+      // eslint-disable-next-line no-console -- a pool has no logger to inject
+      console.warn(`a pooled connection died while idle: ${error.message}`);
+    });
   }
 
   /**

@@ -13,6 +13,25 @@ const POOL_SIZE = 10;
 /** A query still running after this is not slow, it is stuck. */
 const STATEMENT_TIMEOUT_MS = 10_000;
 
+/**
+ * A `pg` pool emits `error` when a connection sitting idle in it dies — the
+ * server restarted, or an administrator terminated it — and `error` with no
+ * listener is how an `EventEmitter` ends a Node process. **Measured, not
+ * guessed**: stopping Postgres under a running API killed the API, on a path
+ * where nothing was being asked and nothing had failed. The pool recovers on
+ * its own; there is nothing to do but say so and let it.
+ *
+ * Logged through `console` rather than `AppLogger` because a pool is built in a
+ * constructor that has no logger to inject without giving every caller one — and
+ * the alternative to a plain line here is a dead process.
+ */
+function keepAlive(pool: Pool): void {
+  pool.on('error', (error: Error) => {
+    // eslint-disable-next-line no-console -- see above
+    console.warn(`a pooled connection died while idle: ${error.message}`);
+  });
+}
+
 @Injectable()
 export class DatabaseService implements OnModuleDestroy, HealthIndicator {
   readonly name = 'postgres';
@@ -28,6 +47,7 @@ export class DatabaseService implements OnModuleDestroy, HealthIndicator {
       statement_timeout: STATEMENT_TIMEOUT_MS,
     });
     this.db = drizzle(this.pool, { schema });
+    keepAlive(this.pool);
   }
 
   async check(): Promise<void> {
