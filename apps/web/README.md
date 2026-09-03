@@ -17,7 +17,8 @@ src/
 ├── components/              presentational primitives; no domain reaches them
 ├── domains/                 one folder per capability
 │   ├── auth/                api/ components/ hooks/ utils/, and an index.ts
-│   └── conversation/        the rail, the room, the stream, and what deletes one
+│   ├── conversation/        the rail, the room, the stream, and what deletes one
+│   └── usage/               the meter, and the banner when a window is spent
 ├── lib/                     api client, http, theme — knows no domain
 ├── config/                  values with no logic in them
 └── utils/                   pure helpers
@@ -273,6 +274,42 @@ The caret at the end of an answer means **this page is receiving those words**,
 not that a row says `generating`. A stored message can be unfinished with nobody
 reading it, and a caret blinking beside a message saying the connection is gone
 would claim two opposite things at once.
+
+## What asking has cost
+
+A meter in the rail, beside the person it belongs to — not in the bar above,
+which is on the sign-in screen too, where there is nobody to have spent
+anything.
+
+**It is written to, not polled.** A budget only moves when something is
+generated, and this page is the thing generating: the stream says what the
+window looks like once, at the end of an answer, and that is put straight where
+the meter reads it. Asking the server the same question again would be a request
+for an answer already in hand. The other thing that moves it is a refusal, and
+that one cannot say by how much — the failure shape is a code, a sentence and a
+request id, deliberately — so a `budget_exceeded` is the one case that reads the
+window again.
+
+**Nothing here works out whether another question will fit.** What is left is a
+subtraction, and there is one function for it in `@fca/contracts` used by both
+sides, so a meter fed by an event and a meter fed by a page load cannot
+disagree. But whether the _next_ answer fits is not a subtraction: a generation
+holds what it might cost before it starts, so a window with a fraction of a cent
+in it is spent for every practical purpose, and only the server knows what the
+next one would hold. It says so, and the composer shuts on being told —
+`exceeded` means "another answer will not fit", not "nothing is left".
+
+The banner counts down rather than saying "later", because the only thing worth
+knowing is whether to wait or to go away, and it unlocks itself when the window
+turns over: somebody who waited should not have to reload to find out they were
+right to. The clock behind it runs only while it is on screen — left running it
+would re-render the shell once a second for as long as the application is open,
+to move a number nobody is looking at.
+
+Money crosses the wire as an integer count of micro-USD in a string and becomes
+a number in exactly one file, at the last moment, for display. Amounts round
+**up** to the cent: `$0.00` beside a bar that has moved reads as a meter that
+does not work.
 
 ## Running it
 

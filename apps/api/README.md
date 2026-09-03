@@ -15,6 +15,7 @@ src/
 │   ├── fastify.ts           adapter options, request-id hook
 │   ├── task-registry.ts     every background task, so shutdown can wait for it
 │   └── shutdown.ts          the order things stop in
+├── budget/                  bounded context: what a question may cost, and what it did
 ├── conversation/            bounded context: conversations and their messages
 ├── identity/                bounded context: password hashing, tokens, sessions
 ├── generation/              bounded context: the policy, the tool, the catalog, the model, the runner
@@ -31,9 +32,6 @@ src/
     ├── queue/               the pump that drains the outbox, and the worker that runs it
     └── redis/               RedisService, Lua scripts, the key registry
 ```
-
-`budget/` lands as it is built, split into `domain`, `application`,
-`infrastructure` and `presentation`.
 
 A layer may only depend inwards and a context may not import another's internals
 — both enforced by `.dependency-cruiser.cjs`, with fixtures in
@@ -260,6 +258,44 @@ Every write that ends a generation is conditional on the row still being
 later and a janitor deciding the same row was abandoned are three writers, and
 the condition means the first of them decides and the others learn that they
 lost — including that they must not put a second terminal event on the stream.
+
+**A spending limit is arithmetic, not a race that is usually won.** Checking a
+total and then adding to it lets any number of requests read the same total and
+all pass. So a question holds what it might cost before it is allowed to become
+work, in one atomic step, and `settled + reserved ≤ limit` holds however many
+arrive at once. What is held is the worst the loop can do — `MAX_DRAFTS` attempts
+of at most `maxToolRounds` queries each, every round sending the whole prompt
+again — which is arithmetic rather than a guess, and an ordinary question gives
+back about ninety-five per cent of it when the books are closed.
+
+The price comes from the model that is **answering**, which is not always the one
+that was asked for: a router accepts `auto` and resolves it per request. The
+boot-time capability check is the one moment before a question when the endpoint
+will say what that means, so the hold is priced with it; the charge is priced
+with the name the provider gave alongside the answer it actually produced. A
+name nobody has priced costs the dearest rate in the table, because guessing
+high refuses somebody early and guessing low lets them spend past the limit.
+
+**The counter is in Redis and the record is in PostgreSQL.** Enforcing a limit
+needs a single atomic step, which a transaction per question would be a poor way
+to get; but a limit a restart resets is not a limit. So every generation writes
+its charge into `usage_events` in the same transaction as the message it belongs
+to — one fact, not two — and the first thing to touch a window Redis has never
+seen reads it back from there. `usage_events.message_id` is deliberately not a
+foreign key: deleting a conversation deletes its messages, and money already
+spent must not go with them, or deleting a conversation is how somebody returns
+their own quota.
+
+Which writer moves the counter is decided by the same conditional write that
+decides which one ended the generation. Settling first would let a process that
+lost the row still charge for it, and the ledger a window is rebuilt from would
+then disagree with the counter it was rebuilding.
+
+**Stopping does not make an answer free.** Aborting abandons a response the
+provider had already begun sending, so the usage for that round never arrives.
+What was written is counted with the tokenizer instead and charged at the price
+of the model that wrote it — which is the one place the tokenizer is needed, and
+the reason it runs on a worker thread rather than on the event loop.
 
 **A list is read by keyset, never by offset.** `OFFSET n` reads n rows in order
 to throw them away, and the rows move underneath whoever is reading: a
