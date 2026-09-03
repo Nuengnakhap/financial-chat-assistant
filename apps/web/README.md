@@ -333,10 +333,21 @@ does not work.
 ```bash
 pnpm dev                         # from the repository root: API on :3000, web on :5173
 pnpm --filter @fca/web dev       # the web app alone; API calls will answer 502
+pnpm --filter @fca/web build     # the bundle
+pnpm --filter @fca/web preview   # the bundle, served on :4173
 ```
 
 The API answering `502` is what the proxy returns when nothing is listening on
 `:3000` — the page says so rather than hanging.
+
+`preview` serves the built page rather than the dev server's, and the proxy is
+one object used by both: `vite preview` does not inherit `server`, so a page
+built without it asks itself for `/api` and gets its own `index.html` back. Two
+things are only true of the build, and both were found by running it — that, and
+a font small enough for Vite to inline, which the page's own
+`Content-Security-Policy` then refuses because a `data:` URL is not `'self'`.
+Fonts are therefore never inlined. Anything that changes what the built page
+loads has to be looked at here, not on `:5173`.
 
 ## Tests
 
