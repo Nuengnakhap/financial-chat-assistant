@@ -66,6 +66,7 @@ describe('asking too often', () => {
     // One after another rather than at once: each has to be counted before the
     // next is asked, which is the shape of somebody reading and then typing.
     for (const _ of Array.from({ length: 6 })) {
+      // eslint-disable-next-line no-await-in-loop -- one at a time is what a window counts
       expect((await throttle.recordSend(ada)).ok).toBe(true);
     }
   });

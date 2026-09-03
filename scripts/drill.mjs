@@ -48,7 +48,9 @@ async function ready() {
 /** Waits for readiness to reach `want`, or gives up. */
 async function until(want, seconds) {
   for (let waited = 0; waited < seconds * 2; waited += 1) {
+    // eslint-disable-next-line no-await-in-loop -- polling is waiting, and waiting is the work here
     if ((await ready()) === want) return true;
+    // eslint-disable-next-line no-await-in-loop -- and so is the pause between two polls
     await sleep(500);
   }
 
@@ -87,7 +89,9 @@ async function live() {
  */
 async function stayedAlive(seconds) {
   for (let checked = 0; checked < seconds * 2; checked += 1) {
+    // eslint-disable-next-line no-await-in-loop -- polling is waiting, and waiting is the work here
     if (!(await live())) return false;
+    // eslint-disable-next-line no-await-in-loop -- and so is the pause between two polls
     await sleep(500);
   }
 

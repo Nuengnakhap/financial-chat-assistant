@@ -127,6 +127,7 @@ async function send(session, conversation, question) {
   const body = JSON.stringify({ content: question, clientMessageId: crypto.randomUUID() });
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- a retry is the previous attempt having failed
     const sent = await api(
       `/api/v1/conversations/${conversation}/messages`,
       { method: 'POST', body },
@@ -138,6 +139,7 @@ async function send(session, conversation, question) {
     const wait = Number(sent.headers.get('retry-after') ?? '10');
     if (!Number.isFinite(wait) || wait <= 0) throw new Error('429 with no usable Retry-After');
     process.stdout.write(`  (waiting ${String(wait)}s for the send limit)\n`);
+    // eslint-disable-next-line no-await-in-loop -- the wait is what the server asked for
     await sleep((wait + 1) * 1_000);
   }
 
@@ -177,6 +179,7 @@ async function read(session, messageId, started) {
   let buffer = '';
 
   for (;;) {
+    // eslint-disable-next-line no-await-in-loop -- a stream arrives in the order it arrives
     const { done, value } = await reader.read();
     if (done) break;
 
@@ -212,6 +215,7 @@ console.log(`Asking ${API} as a throwaway account.`);
 
 const answered = [];
 for (const question of ANSWERABLE) {
+  // eslint-disable-next-line no-await-in-loop -- one at a time, or this trips the send limit it is measuring
   const run = await ask(session, question);
   answered.push(run);
   console.log(`  ${run.verdict === 'pass' ? 'pass' : 'FAIL'}  ${question}`);
@@ -222,6 +226,7 @@ console.log('\nTraps — the answer has to say the dataset does not have it');
 const trapped = [];
 let missed = 0;
 for (const question of TRAPS) {
+  // eslint-disable-next-line no-await-in-loop -- one at a time, or this trips the send limit it is measuring
   const run = await ask(session, question);
   trapped.push(run);
   // Two things, and the system guarantees the second: it must say so, and

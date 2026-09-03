@@ -93,6 +93,7 @@ export class InMemoryGenerationEvents implements GenerationEvents {
 
       // Nothing to ask for until something is written, which is the shape of
       // a live tail.
+      // eslint-disable-next-line no-await-in-loop -- a tail waits for the next write, one at a time
       await this.somethingHappens(messageId, signal);
     }
   }

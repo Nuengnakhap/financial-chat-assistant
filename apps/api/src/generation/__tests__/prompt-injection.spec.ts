@@ -97,6 +97,7 @@ function taken(...turns: (readonly CompletionChunk[])[]): LlmGateway {
       round += 1;
 
       return (async function* stream(): AsyncIterable<CompletionChunk> {
+        // eslint-disable-next-line no-await-in-loop -- a stream yields in order or it is not a stream
         for (const chunk of chunks) yield await Promise.resolve(chunk);
       })();
     },

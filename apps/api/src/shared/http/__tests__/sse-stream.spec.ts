@@ -64,6 +64,7 @@ const logger = new AppLogger(
 );
 
 async function* frames(...items: Frame[]): AsyncIterable<Frame> {
+  // eslint-disable-next-line no-await-in-loop -- a stream yields in order or it is not a stream
   for (const item of items) yield await Promise.resolve(item);
 }
 

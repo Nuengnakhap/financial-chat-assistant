@@ -38,6 +38,7 @@ const countsAfter = async (...written: StreamEvent[]): Promise<Record<string, nu
   const counters = new Counters();
   const inner = { append: async () => await Promise.resolve() } as unknown as GenerationStream;
   const events = new CountingGenerationEvents(inner, counters);
+  // eslint-disable-next-line no-await-in-loop -- written in order, because the count is about what got through
   for (const event of written) await events.append(ANSWER, event);
 
   return { ...counters.snapshot() };
@@ -102,6 +103,7 @@ describe('counting what a generation turned out to be', () => {
       { type: 'text_delta', delta: 'Apple' },
     ];
 
+    // eslint-disable-next-line no-await-in-loop -- written in order, because the count is about what got through
     for (const event of written) await events.append(ANSWER, event);
 
     expect(seen).toEqual(written);

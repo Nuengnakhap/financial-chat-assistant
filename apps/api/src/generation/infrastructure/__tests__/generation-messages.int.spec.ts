@@ -74,6 +74,7 @@ const PASSED = { verdict: 'pass', checkedClaims: [], violations: [] };
 async function write(...turns: Written[]): Promise<Answer> {
   let last: string | undefined;
   for (const [index, turn] of turns.entries()) {
+    // eslint-disable-next-line no-await-in-loop -- each row's seq depends on the one before it
     const [row] = await harness.db
       .insert(messages)
       .values({
