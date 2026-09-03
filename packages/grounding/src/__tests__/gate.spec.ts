@@ -82,6 +82,62 @@ function cut(markdown: string, sizes: readonly number[]): readonly string[] {
   return chunks;
 }
 
+/**
+ * The gate with nothing behind it — the model answered without asking anything,
+ * which is what a fooled model does and what an ordinary chatty one does too.
+ *
+ * Every property test above hands the gate a result, so `groundless` was false
+ * in all of them and the code path that watches for a refusal phrase had never
+ * been exercised with a figure in the answer. That path narrows how far the
+ * gate may release; the bug was that it narrowed it to less than the width of
+ * one figure, and a claim that never fits inside the window is a claim that is
+ * never judged.
+ */
+describe('an answer written without asking anything', () => {
+  const invented = 'Apple made $999.9B in 2023, and here is a joke: knock knock.';
+
+  it('never shows a figure that nothing supports', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.integer({ min: 1, max: 20 }), { minLength: 1, maxLength: 40 }),
+        (sizes) => {
+          const run = stream(invented, cut(invented, sizes), []);
+
+          expect(run.emitted).not.toContain('999');
+          expect(run.events.some((event) => event.kind === 'violation')).toBe(true);
+        },
+      ),
+      { numRuns: 2_000 },
+    );
+  });
+
+  it('stops at the figure even when the answer keeps going afterwards', () => {
+    // One character at a time is the worst case and the realistic one: it is
+    // how the provider streams. It is also the shape that made the window one
+    // character wide, so a seven-character figure could never fit in it.
+    const run = stream(invented, Array.from(invented), []);
+
+    expect(run.emitted).toBe('Apple made ');
+    expect(run.events.at(-1)).toEqual({
+      kind: 'violation',
+      violation: { text: '$999.9B', reason: 'no_evidence' },
+    });
+  });
+
+  it('agrees with the verifier, which is the property that must not bend', () => {
+    expect(verify(invented, [], coverage).verdict).toBe('fail');
+    expect(stream(invented, Array.from(invented), []).emitted).not.toContain('999');
+  });
+
+  it('still lets ordinary prose through a character at a time', () => {
+    // The other half: a gate that held everything back would pass the tests
+    // above and make the product unusable.
+    const said = 'That dataset covers a handful of companies, and I can look them up.';
+
+    expect(stream(said, Array.from(said), []).emitted).toBe(said);
+  });
+});
+
 describe('however the answer is cut up', () => {
   it('releases exactly the answer, byte for byte', () => {
     // The property the phase exists for. Nothing in the gate looks at where a

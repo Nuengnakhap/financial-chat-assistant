@@ -136,6 +136,32 @@ interface Window {
   readonly to: number;
 }
 
+/**
+ * How far it is safe to release once the figures are taken into account: never
+ * past the beginning of one that does not fit inside the window yet.
+ *
+ * Without this the window can be narrower than a figure and the figure is
+ * skipped rather than held — `break` leaves it unjudged, the release moves past
+ * it anyway, and on the next pass it begins before the window and is skipped
+ * again, for good. Measured: a figure in an answer written without asking
+ * anything reached the screen in full, one character at a time, because the
+ * refusal-phrase reach held the window to a single character while the release
+ * point advanced through it.
+ *
+ * Clamping instead of skipping restores what the rest of this file assumes —
+ * that text is released only once its reading has been decided.
+ */
+function heldFrom(text: string, window: Window): number {
+  const from = lineStartAt(text, window.from);
+
+  for (const literal of extractNumericClaims(text.slice(from))) {
+    const at = from + literal.at;
+    if (at + literal.text.length > window.to) return Math.max(window.from, Math.min(window.to, at));
+  }
+
+  return window.to;
+}
+
 function firstBadFigure(rules: Rules, text: string, window: Window): Stop | null {
   const from = lineStartAt(text, window.from);
 
@@ -184,8 +210,11 @@ export function openGate(results: readonly ToolResult[], coverage: Coverage): Ga
   const advance = (final: boolean): readonly GateEvent[] => {
     if (stopped) return [];
 
-    const to = reachOf(text, rules.groundless, final);
-    const stop = firstStop(rules, text, { from: released, to });
+    const reach = reachOf(text, rules.groundless, final);
+    // Two limits, and the narrower wins: how much of the answer means what it
+    // will always mean, and how much of it has been decided.
+    const to = heldFrom(text, { from: released, to: reach });
+    const stop = firstStop(rules, text, { from: released, to: reach });
     const upto = stop === null ? to : Math.max(released, stop.at);
     const cleared = text.slice(released, upto);
 
