@@ -5,10 +5,11 @@ import { Injectable } from '@nestjs/common';
 import { FINANCIAL_DATA_COLUMNS, type ColumnUnit } from './financial-data.table';
 import { FinancialQueryPool, type QueryRows } from '../../shared/financial/financial-query.pool';
 import type { CatalogSource } from '../application/ports/semantic-catalog.port';
-import type {
-  CatalogColumn,
-  CatalogCompany,
-  SemanticCatalog,
+import {
+  coverageOf,
+  type CatalogColumn,
+  type CatalogCompany,
+  type SemanticCatalog,
 } from '../application/semantic-catalog';
 
 /**
@@ -27,7 +28,7 @@ import type {
  */
 
 /** Bumped when `renderSystemPrompt` changes shape, since the prefix then differs. */
-const CATALOG_FORMAT = 1;
+const CATALOG_FORMAT = 2;
 
 @Injectable()
 export class SemanticCatalogBuilder implements CatalogSource {
@@ -47,7 +48,13 @@ export class SemanticCatalogBuilder implements CatalogSource {
       describeColumn(name, unit, countFrom(recordedRow, name) ?? rows),
     );
 
-    return withFingerprint({ companies, columns, rows, years: yearsOf(companies) });
+    const catalog = withFingerprint({ companies, columns, rows, years: yearsOf(companies) });
+    // Asked here, where a failure is a refresh that logs and keeps the previous
+    // reading, rather than at the start of a generation where it would be an
+    // exception in front of somebody waiting for an answer.
+    coverageOf(catalog);
+
+    return catalog;
   }
 }
 

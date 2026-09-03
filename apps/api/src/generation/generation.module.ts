@@ -6,7 +6,7 @@ import { GenerationContextFactory } from './application/generation-context';
 import { GenerationJanitor } from './application/generation-janitor';
 import { GenerationSupervisor } from './application/generation-supervisor';
 import { LlmCapabilityService } from './application/llm-capability.service';
-import { FINANCIAL_QUERY_TOOL } from './application/ports/financial-query.tool.port';
+import { AGENT_TOOLS, type AgentTool } from './application/ports/agent-tool.port';
 import { GENERATION_EVENTS } from './application/ports/generation-events.port';
 import { GENERATION_MESSAGES } from './application/ports/generation-messages.port';
 import { GENERATION_STOPS } from './application/ports/generation-stops.port';
@@ -19,6 +19,7 @@ import { EndAbandonedGenerationsUseCase } from './application/use-cases/end-aban
 import { StopGenerationUseCase } from './application/use-cases/stop-generation.use-case';
 import { WatchGenerationUseCase } from './application/use-cases/watch-generation.use-case';
 import { CachedFinancialQuery } from './infrastructure/cached-financial-query';
+import { DescribeCoverageTool } from './infrastructure/describe-coverage.tool';
 import { DrizzleGenerationMessages } from './infrastructure/drizzle-generation-messages';
 import { PgFinancialQueryTool } from './infrastructure/financial-query.tool';
 import { GenerationStream } from './infrastructure/generation-stream';
@@ -69,7 +70,18 @@ import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
     { provide: SQL_POLICY, useExisting: PgAstSqlPolicy },
     CachedFinancialQuery,
     PgFinancialQueryTool,
-    { provide: FINANCIAL_QUERY_TOOL, useExisting: PgFinancialQueryTool },
+    DescribeCoverageTool,
+    // The registry. Adding a third tool is a class and a line here — the runner
+    // sends whatever is in this array and dispatches by the name the model used,
+    // and has no idea what any of them do. See CONTRIBUTING.md.
+    {
+      provide: AGENT_TOOLS,
+      useFactory: (
+        query: PgFinancialQueryTool,
+        coverage: DescribeCoverageTool,
+      ): readonly AgentTool[] => [query, coverage],
+      inject: [PgFinancialQueryTool, DescribeCoverageTool],
+    },
     SemanticCatalogBuilder,
     { provide: CATALOG_SOURCE, useExisting: SemanticCatalogBuilder },
     SemanticCatalogService,
@@ -101,7 +113,7 @@ import { StreamMultiplexer } from '../shared/redis/stream-multiplexer';
   // before the server stops accepting connections; the subscriber leaves for the
   // handler list the composition root builds.
   exports: [
-    FINANCIAL_QUERY_TOOL,
+    AGENT_TOOLS,
     SQL_POLICY,
     LLM_GATEWAY,
     GenerationSubscriber,

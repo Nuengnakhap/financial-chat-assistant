@@ -41,6 +41,13 @@ describe('what a generation is told before it starts', () => {
         columns: new Map([
           ['company', 'plain'],
           ['revenue', 'money'],
+          // The columns `describe_coverage` answers with, registered so that a
+          // count in its result cannot support a dollar figure.
+          ['rows', 'plain'],
+          ['companies', 'plain'],
+          ['first_year', 'plain'],
+          ['last_year', 'plain'],
+          ['revenue_recorded', 'plain'],
         ]),
       },
       maxOutputTokens: 1_500,

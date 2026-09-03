@@ -1,7 +1,7 @@
 import type { ToolResultRow } from '@fca/contracts';
 import type { ToolResult } from '@fca/grounding';
 
-import type { QueryOutcome } from './ports/financial-query.tool.port';
+import type { QueryOutcome } from './ports/tool-outcome';
 
 /**
  * The two readings of one query result, and why they are not the same object.

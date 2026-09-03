@@ -1,16 +1,14 @@
 import { formatUsd, ratio, roundToInteger } from '@fca/grounding';
 import { Inject, Injectable } from '@nestjs/common';
+import { z } from 'zod';
 
 import { CachedFinancialQuery, type QueryReading } from './cached-financial-query';
 import { CpuPool } from '../../shared/cpu/cpu-pool';
 import { asError } from '../../shared/observability/app-logger';
-import type {
-  FinancialQueryTool,
-  QueryOutcome,
-  ToolFailure,
-  Truncation,
-} from '../application/ports/financial-query.tool.port';
+import type { AgentTool } from '../application/ports/agent-tool.port';
 import { SQL_POLICY, type SqlPolicy } from '../application/ports/sql-policy.port';
+import type { QueryOutcome, ToolFailure, Truncation } from '../application/ports/tool-outcome';
+import { QUERY_TOOL } from '../application/prompt.factory';
 import { toModelMessage } from '../application/query-outcome';
 
 /**
@@ -38,22 +36,36 @@ const TRUNCATION_HINT =
   'The result was cut to fit. Aggregate in SQL — sum, avg or count with GROUP BY — or order ' +
   'and take fewer rows, rather than asking for all of them.';
 
+/** The one argument this tool takes, read at the boundary where it arrives. */
+const toolArguments = z.object({ sql: z.string() });
+
 @Injectable()
-export class PgFinancialQueryTool implements FinancialQueryTool {
+export class PgFinancialQueryTool implements AgentTool {
+  readonly definition = QUERY_TOOL;
+
   constructor(
     @Inject(SQL_POLICY) private readonly policy: SqlPolicy,
     private readonly query: CachedFinancialQuery,
     private readonly cpu: CpuPool,
   ) {}
 
-  async execute(toolCallId: string, sql: string): Promise<QueryOutcome> {
+  async execute(toolCallId: string, argumentsJson: string): Promise<QueryOutcome> {
     const started = performance.now();
+    const sql = sqlIn(argumentsJson);
 
-    const plan = this.policy.validate(sql);
+    // The policy is what says a statement is not one, so unreadable arguments
+    // go through it rather than round it: the model then hears the same sentence
+    // for "that is not a SELECT" however the argument was mangled.
+    const plan = this.policy.validate(sql ?? '');
     if (!plan.ok) {
+      // Named even though it was refused: the card a person is shown is built
+      // from this, and so is the `tool_call_part` kept on the row. Leaving it
+      // out puts the raw arguments there — `{"sql":"…"}` — on the one path
+      // where a reader most wants to see the statement that was turned down.
       return failed(toolCallId, {
         failure: { kind: plan.error.rule, message: plan.error.message },
         started,
+        sql,
       });
     }
 
@@ -196,12 +208,24 @@ function usdText(value: string | null): string | null {
   return formatUsd(roundToInteger(ratio(numerator, 10n ** BigInt(fraction.length))));
 }
 
+function sqlIn(argumentsJson: string): string | null {
+  try {
+    const parsed = toolArguments.safeParse(JSON.parse(argumentsJson));
+    return parsed.success ? parsed.data.sql : null;
+  } catch {
+    return null;
+  }
+}
+
 /** A call that produced no rows, and what to say about it. */
 interface Failure {
   readonly failure: ToolFailure;
   readonly started: number;
-  /** The canonical form, when the query got far enough to have one. */
-  readonly sql?: string;
+  /**
+   * The canonical form once there is one, what the model wrote before that, and
+   * null only when the arguments held no statement at all.
+   */
+  readonly sql: string | null;
 }
 
 function failed(toolCallId: string, refusal: Failure): QueryOutcome {
@@ -209,7 +233,7 @@ function failed(toolCallId: string, refusal: Failure): QueryOutcome {
 
   return {
     toolCallId,
-    sql: refusal.sql ?? null,
+    sql: refusal.sql,
     columns: [],
     rows: [],
     display: new Map(),

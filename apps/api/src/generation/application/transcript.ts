@@ -1,12 +1,12 @@
 import type { ToolResult } from '@fca/grounding';
 
-import type { QueryOutcome } from './ports/financial-query.tool.port';
 import type {
   ChatMessage,
   CompletionRequest,
   ToolCall,
   ToolDefinition,
 } from './ports/llm-gateway.port';
+import type { QueryOutcome } from './ports/tool-outcome';
 import { toEvidence, toModelMessage } from './query-outcome';
 
 /**

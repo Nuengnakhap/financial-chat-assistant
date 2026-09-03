@@ -86,9 +86,11 @@ describe('the system prompt', () => {
     // Order with NULLS LAST, or "the five largest" starts with the ones that
     // have no figure at all.
     expect(prompt).toContain('NULLS LAST');
-    // Query before refusing, because a refusal with no query behind it is
-    // rejected by verification exactly like an unsupported figure.
-    expect(prompt).toContain('Before saying this dataset does not have something, query for it');
+    // Call a tool before refusing, because a refusal with nothing behind it is
+    // rejected by verification exactly like an unsupported figure — and the
+    // cheap way to have something behind it is to ask what the dataset covers.
+    expect(prompt).toContain('Before saying this dataset does not have something, call a tool');
+    expect(prompt).toContain('describe_coverage() for a company, a year or a metric');
     // A ratio in the result and a percentage in the sentence are different
     // numbers, and the sentence is the one that gets checked.
     expect(prompt).toContain('multiply by 100 there, so the result holds 6.4 rather than 0.064');
@@ -135,6 +137,19 @@ describe('the system prompt', () => {
 });
 
 describe('the coverage the verifier is given', () => {
+  it('refuses a dataset whose column is called what the coverage tool calls one', () => {
+    // Reachable by reseeding, which is the whole point of reading coverage from
+    // the database. Letting the coverage name win would demote a money column
+    // to plain, and every figure read from it would be refused as a unit
+    // mismatch — a correct answer thrown away for a reason nobody could find.
+    const collides = {
+      ...CATALOG,
+      columns: [...CATALOG.columns, { name: 'first_year', kind: 'money' as const, recorded: 9 }],
+    };
+
+    expect(() => coverageOf(collides)).toThrow(/first_year/u);
+  });
+
   it("is the catalog's years and column kinds, and not its companies", () => {
     expect(coverageOf(CATALOG)).toEqual({
       years: [2022, 2023, 2024, 2025],
@@ -143,6 +158,15 @@ describe('the coverage the verifier is given', () => {
         ['year', 'plain'],
         ['revenue', 'money'],
         ['gross_profit', 'money'],
+        // What `describe_coverage` answers with. They are here so that a count
+        // of rows cannot be evidence for a dollar figure: a column the verifier
+        // has never heard of is left alone rather than refused.
+        ['rows', 'plain'],
+        ['companies', 'plain'],
+        ['first_year', 'plain'],
+        ['last_year', 'plain'],
+        ['revenue_recorded', 'plain'],
+        ['gross_profit_recorded', 'plain'],
       ]),
     });
   });

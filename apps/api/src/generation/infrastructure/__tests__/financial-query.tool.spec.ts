@@ -3,6 +3,7 @@ import { verify, type Coverage } from '@fca/grounding';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { CpuPool } from '../../../shared/cpu/cpu-pool';
+import type { QueryOutcome } from '../../application/ports/tool-outcome';
 import { toEvidence, toModelMessage } from '../../application/query-outcome';
 import type { CachedFinancialQuery, QueryReading } from '../cached-financial-query';
 import { PgFinancialQueryTool } from '../financial-query.tool';
@@ -69,9 +70,23 @@ beforeEach(() => {
   tool = new PgFinancialQueryTool(policy, query.service, fakeCpu());
 });
 
+/**
+ * The arguments as the model writes them. This tool takes one, called `sql`,
+ * and reading it out of the JSON is its own business rather than the runner's —
+ * which is what `AgentTool` made true.
+ */
+function asking(
+  tool: PgFinancialQueryTool,
+  toolCallId: string,
+  sql: string,
+): Promise<QueryOutcome> {
+  return tool.execute(toolCallId, JSON.stringify({ sql }));
+}
+
 describe('the financial query tool', () => {
   it('hands back the rows, the count and a display string per amount', async () => {
-    const outcome = await tool.execute(
+    const outcome = await asking(
+      tool,
       'call-1',
       'SELECT company, year, revenue, net_income FROM financial_data',
     );
@@ -85,7 +100,7 @@ describe('the financial query tool', () => {
   });
 
   it('says nothing about a year or a name, which are not amounts', async () => {
-    const outcome = await tool.execute('call-1', 'SELECT company, year FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT company, year FROM financial_data');
 
     expect(outcome.display.size).toBe(0);
   });
@@ -99,7 +114,8 @@ describe('the financial query tool', () => {
       fromCache: false,
     };
 
-    const outcome = await tool.execute(
+    const outcome = await asking(
+      tool,
       'call-1',
       'SELECT company, gross_profit FROM financial_data',
     );
@@ -115,7 +131,8 @@ describe('the financial query tool', () => {
       fromCache: false,
     };
 
-    const outcome = await tool.execute(
+    const outcome = await asking(
+      tool,
       'call-1',
       'SELECT sector, avg(revenue) FROM financial_data GROUP BY sector',
     );
@@ -125,7 +142,7 @@ describe('the financial query tool', () => {
   });
 
   it('refuses what the policy refuses, without running anything', async () => {
-    const outcome = await tool.execute('call-1', 'SELECT * FROM users');
+    const outcome = await asking(tool, 'call-1', 'SELECT * FROM users');
 
     expect(outcome.failure?.kind).toBe('table');
     expect(query.ran).toBe(0);
@@ -133,10 +150,29 @@ describe('the financial query tool', () => {
     expect(outcome.rows).toEqual([]);
   });
 
+  it('still names the statement it refused', async () => {
+    // The provenance card a person is shown is built from `sql`, and it is
+    // written to `messages.parts` and kept. Leaving it null on this path put
+    // the raw arguments — `{"sql":"SELECT * FROM users"}` — on the card and in
+    // the row, because the caller has nothing else to fall back to.
+    const outcome = await asking(tool, 'call-1', 'SELECT * FROM users');
+
+    expect(outcome.sql).toBe('SELECT * FROM users');
+  });
+
+  it('has no statement to name when the arguments were not one', async () => {
+    // Nothing was said that could be shown as SQL. Null is the honest answer,
+    // and the caller shows what the model actually wrote instead.
+    const outcome = await tool.execute('call-1', 'not json at all');
+
+    expect(outcome.failure).not.toBeNull();
+    expect(outcome.sql).toBeNull();
+  });
+
   it('turns a server failure into an outcome the model can read', async () => {
     query.failWith = new Error('canceling statement due to statement timeout');
 
-    const outcome = await tool.execute('call-1', 'SELECT company FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT company FROM financial_data');
 
     expect(outcome.failure?.kind).toBe('database');
     expect(outcome.failure?.message).toContain('statement timeout');
@@ -145,7 +181,7 @@ describe('the financial query tool', () => {
   it('tells the model an error and nothing that looks like a result', async () => {
     // A result shape beside an error invites reading it as "nothing matched",
     // and answering from memory instead of querying again.
-    const outcome = await tool.execute('call-1', 'SELECT * FROM users');
+    const outcome = await asking(tool, 'call-1', 'SELECT * FROM users');
 
     expect(JSON.parse(toModelMessage(outcome))).toEqual({
       error: expect.stringContaining('financial_data'),
@@ -166,7 +202,7 @@ describe('the financial query tool', () => {
       fromCache: false,
     };
 
-    const outcome = await tool.execute('call-1', 'SELECT company, revenue FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT company, revenue FROM financial_data');
 
     expect(outcome.display.size).toBe(0);
     // The rows are still there in full: what is refused is a string that could
@@ -177,7 +213,7 @@ describe('the financial query tool', () => {
   it('says whether the answer came from the cache', async () => {
     query.reading = { ...APPLE, fromCache: true };
 
-    expect((await tool.execute('call-1', 'SELECT company FROM financial_data')).fromCache).toBe(
+    expect((await asking(tool, 'call-1', 'SELECT company FROM financial_data')).fromCache).toBe(
       true,
     );
   });
@@ -213,7 +249,7 @@ describe('the token budget', () => {
   it('cuts a result that will not fit and says so', async () => {
     query.reading = wideResult(50);
 
-    const outcome = await tool.execute('call-1', 'SELECT * FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT * FROM financial_data');
 
     expect(outcome.truncated).not.toBeNull();
     expect(outcome.rows.length).toBe(outcome.truncated?.shown);
@@ -228,7 +264,7 @@ describe('the token budget', () => {
   it('cuts to something that fits', async () => {
     query.reading = wideResult(50);
 
-    const outcome = await tool.execute('call-1', 'SELECT * FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT * FROM financial_data');
 
     expect(Math.ceil(toModelMessage(outcome).length / 4)).toBeLessThanOrEqual(1_500);
   });
@@ -244,7 +280,7 @@ describe('the token budget', () => {
       fromCache: false,
     };
 
-    const outcome = await tool.execute('call-1', 'SELECT company FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT company FROM financial_data');
 
     expect(outcome.rows.length).toBe(3);
   });
@@ -252,7 +288,7 @@ describe('the token budget', () => {
   it('leaves a result that fits alone', async () => {
     query.reading = wideResult(4);
 
-    const outcome = await tool.execute('call-1', 'SELECT * FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT * FROM financial_data');
 
     expect(outcome.truncated).toBeNull();
     expect(outcome.rows.length).toBe(4);
@@ -261,7 +297,7 @@ describe('the token budget', () => {
   it('builds evidence from the rows that were shown, not the ones that were cut', async () => {
     query.reading = wideResult(50);
 
-    const outcome = await tool.execute('call-1', 'SELECT * FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT * FROM financial_data');
 
     expect(toEvidence(outcome).rows.length).toBe(outcome.rows.length);
   });
@@ -283,7 +319,8 @@ describe('a figure copied from a display string', () => {
     // function the finished answer is checked against, so a figure the model
     // copies out of `display` passes verification by construction rather than by
     // luck. If these two ever formatted differently, this test is what says so.
-    const outcome = await tool.execute(
+    const outcome = await asking(
+      tool,
       'call-1',
       'SELECT company, year, revenue, net_income FROM financial_data',
     );
@@ -300,7 +337,8 @@ describe('a figure copied from a display string', () => {
   });
 
   it('and a figure that was not in the result is refused', async () => {
-    const outcome = await tool.execute(
+    const outcome = await asking(
+      tool,
       'call-1',
       'SELECT company, year, revenue, net_income FROM financial_data',
     );
@@ -314,7 +352,7 @@ describe('a figure copied from a display string', () => {
 describe('the tool never throws', () => {
   it('not even when the query object does something unexpected', async () => {
     query.failWith = new Error('socket hang up');
-    const outcome = await tool.execute('call-1', 'SELECT company FROM financial_data');
+    const outcome = await asking(tool, 'call-1', 'SELECT company FROM financial_data');
 
     expect(outcome.failure?.kind).toBe('database');
   });
@@ -327,7 +365,8 @@ describe('the tool never throws', () => {
       },
     } as unknown as CachedFinancialQuery;
 
-    const outcome = await new PgFinancialQueryTool(policy, rejecting, fakeCpu()).execute(
+    const outcome = await asking(
+      new PgFinancialQueryTool(policy, rejecting, fakeCpu()),
       'call-1',
       'SELECT company FROM financial_data',
     );

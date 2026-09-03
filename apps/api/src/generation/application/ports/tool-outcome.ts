@@ -1,7 +1,13 @@
 import type { SqlRule } from './sql-policy.port';
 
 /**
- * The one tool the model has, and the shape of what one call to it produced.
+ * What one call to a tool produced.
+ *
+ * Every tool answers in this shape, and that is not a convenience: a figure in
+ * an answer is checked against tool results, so a tool whose output is not
+ * rows and columns is a tool whose output cannot be evidence for anything. The
+ * price of a second tool is saying which statement its numbers came from — and
+ * that price is the guarantee.
  *
  * Nothing here throws. A query the policy refused, a query the server refused
  * and a query that returned nothing are all outcomes with the same standing: the
@@ -10,8 +16,11 @@ import type { SqlRule } from './sql-policy.port';
  * wrong answer to "that query was not allowed".
  */
 
-/** `database` is the server refusing; the rest are the policy refusing. */
-type FailureKind = SqlRule | 'database';
+/**
+ * `database` is the server refusing and `unknown_tool` is the model asking for
+ * something that does not exist; the rest are the policy refusing.
+ */
+type FailureKind = SqlRule | 'database' | 'unknown_tool';
 
 export interface ToolFailure {
   readonly kind: FailureKind;
@@ -60,9 +69,3 @@ export interface QueryOutcome {
   readonly fromCache: boolean;
   readonly failure: ToolFailure | null;
 }
-
-export interface FinancialQueryTool {
-  execute(toolCallId: string, sql: string): Promise<QueryOutcome>;
-}
-
-export const FINANCIAL_QUERY_TOOL = Symbol('FinancialQueryTool');

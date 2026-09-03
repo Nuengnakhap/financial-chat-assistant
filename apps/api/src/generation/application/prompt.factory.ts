@@ -5,7 +5,7 @@ import type { SemanticCatalog } from './semantic-catalog';
 
 /**
  * Everything the model is told, in one place: the dataset it may speak about,
- * the rules it works under, and the one tool it has.
+ * the rules it works under, and the tools it has.
  *
  * A pure function of the catalog, which is what makes the prefix byte-identical
  * whenever the data has not changed — the condition for a provider's automatic
@@ -60,8 +60,25 @@ export const QUERY_TOOL: ToolDefinition = {
   },
 };
 
+const COVERAGE_TOOL_NAME = 'describe_coverage';
+
+/**
+ * The second tool. Its definition lives beside the prompt for the same reason
+ * the first one's does: what a tool is for and when the model should reach for
+ * it are one thought, and splitting them across two files is how they come to
+ * disagree.
+ */
+export const COVERAGE_TOOL: ToolDefinition = {
+  name: COVERAGE_TOOL_NAME,
+  description:
+    'Ask what this dataset covers: how many rows and companies it holds, the first and last ' +
+    'fiscal year in it, and how many rows have each amount recorded. Takes no arguments. Use ' +
+    'it before saying the dataset does not have something.',
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
+};
+
 export function renderSystemPrompt(catalog: SemanticCatalog): string {
-  return `You are a financial data assistant. You answer questions about the revenue and income of U.S. public companies using one tool: ${QUERY_TOOL_NAME}(sql).
+  return `You are a financial data assistant. You answer questions about the revenue and income of U.S. public companies using two tools: ${QUERY_TOOL_NAME}(sql), which runs one SELECT, and ${COVERAGE_TOOL_NAME}(), which says what the dataset covers.
 
 ## The dataset — your only source of truth
 Table: financial_data(${catalog.columns.map((column) => column.name).join(', ')}). All amounts are US dollars.
@@ -78,7 +95,7 @@ ${catalog.columns
 1. You have no knowledge of these companies' financials. Every figure must come from a tool result in this conversation.
 2. Your answer is checked automatically while it streams. A figure that does not appear in a tool result is refused, and the answer is discarded and written again. Copy figures from the "display" values in tool results exactly.
 3. Call ${QUERY_TOOL_NAME} before stating any figure.
-4. Before saying this dataset does not have something, query for it anyway. The empty result is what makes that a fact rather than a guess, and saying it without querying is refused the same way an unsupported figure is.
+4. Before saying this dataset does not have something, call a tool anyway — ${COVERAGE_TOOL_NAME}() for a company, a year or a metric it may not cover at all, ${QUERY_TOOL_NAME} for anything else. The result is what makes that a fact rather than a guess, and saying it without one is refused the same way an unsupported figure is.
 5. When the answer is that the data is not there, say so plainly — "this dataset does not have ..." — say what it does have instead, and never estimate.
 6. Compute every total, average, growth rate and ranking in SQL. Never in your head.
 7. The amounts are whole numbers, so dividing one by another throws the fraction away and gives 0 or 1. Multiply by 100.0 before dividing, or cast one side to numeric.

@@ -19,7 +19,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { AgentEvent } from './agent-events';
 import { Draft, type Written } from './draft';
 import { GenerationContextFactory, type GenerationContext } from './generation-context';
-import { FINANCIAL_QUERY_TOOL, type FinancialQueryTool } from './ports/financial-query.tool.port';
+import { AGENT_TOOLS, type AgentTool } from './ports/agent-tool.port';
 import { LLM_GATEWAY, type LlmGateway } from './ports/llm-gateway.port';
 import type { PastTurn } from './transcript';
 import { Transcript } from './transcript';
@@ -71,7 +71,7 @@ export interface GenerationRequest {
 export class AgentRunner {
   constructor(
     @Inject(LLM_GATEWAY) private readonly gateway: LlmGateway,
-    @Inject(FINANCIAL_QUERY_TOOL) private readonly tool: FinancialQueryTool,
+    @Inject(AGENT_TOOLS) private readonly tools: readonly AgentTool[],
     private readonly contexts: GenerationContextFactory,
   ) {}
 
@@ -95,7 +95,7 @@ export class AgentRunner {
     signal: AbortSignal,
   ): AsyncGenerator<AgentEvent> {
     const transcript = new Transcript(context.systemPrompt, request.history, request.question);
-    const draft = new Draft(this.gateway, this.tool, context);
+    const draft = new Draft(this.gateway, this.tools, context);
     const attempt: Attempt = { transcript, context };
     let phase = move(INITIAL_GENERATION_PHASE, 'streaming');
 

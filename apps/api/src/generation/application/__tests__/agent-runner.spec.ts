@@ -4,13 +4,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { AgentEvent } from '../agent-events';
 import { AgentRunner, type GenerationRequest } from '../agent-runner';
 import type { GenerationContext, GenerationContextFactory } from '../generation-context';
-import type { FinancialQueryTool, QueryOutcome } from '../ports/financial-query.tool.port';
+import type { AgentTool } from '../ports/agent-tool.port';
 import type {
   ChatMessage,
   CompletionChunk,
   CompletionRequest,
   LlmGateway,
 } from '../ports/llm-gateway.port';
+import type { QueryOutcome } from '../ports/tool-outcome';
+import { QUERY_TOOL } from '../prompt.factory';
 
 /**
  * Every branch of a generation, with a model that is a list.
@@ -132,18 +134,24 @@ function fakeGateway(...turns: (readonly CompletionChunk[])[]): FakeGateway {
 }
 
 interface FakeTool {
-  readonly tool: FinancialQueryTool;
+  readonly tool: AgentTool;
   outcomes: QueryOutcome[];
   asked: string[];
 }
 
+/**
+ * A tool named the way the fake model names it, since the runner now dispatches
+ * by name. The arguments arrive as the JSON the model wrote, and reading `sql`
+ * out of them is this tool's business rather than the runner's.
+ */
 function fakeTool(...outcomes: QueryOutcome[]): FakeTool {
   const fake: FakeTool = {
     outcomes: outcomes.length > 0 ? outcomes : [APPLE],
     asked: [],
     tool: {
-      execute: async (toolCallId, sql): Promise<QueryOutcome> => {
-        fake.asked.push(sql);
+      definition: QUERY_TOOL,
+      execute: async (toolCallId, argumentsJson): Promise<QueryOutcome> => {
+        fake.asked.push(sqlIn(argumentsJson));
         const outcome = fake.outcomes[Math.min(fake.asked.length - 1, fake.outcomes.length - 1)];
         return await Promise.resolve({ ...(outcome ?? APPLE), toolCallId });
       },
@@ -153,13 +161,25 @@ function fakeTool(...outcomes: QueryOutcome[]): FakeTool {
   return fake;
 }
 
+function sqlIn(argumentsJson: string): string {
+  try {
+    const parsed: unknown = JSON.parse(argumentsJson);
+    const sql =
+      typeof parsed === 'object' && parsed !== null ? Reflect.get(parsed, 'sql') : undefined;
+
+    return typeof sql === 'string' ? sql : '';
+  } catch {
+    return '';
+  }
+}
+
 function runnerWith(
   gateway: FakeGateway,
   tool: FakeTool,
   context: GenerationContext | null = CONTEXT,
 ): AgentRunner {
   const contexts = { current: () => context } as unknown as GenerationContextFactory;
-  return new AgentRunner(gateway.gateway, tool.tool, contexts);
+  return new AgentRunner(gateway.gateway, [tool.tool], contexts);
 }
 
 const QUESTION: GenerationRequest = { question: "Apple's revenue?", history: [] };
@@ -481,7 +501,7 @@ describe('when something is wrong with the machinery', () => {
     // Without the catalog the model would be told nothing about coverage and
     // would answer from memory, which is the one thing this system prevents.
     const contexts = { current: () => null } as unknown as GenerationContextFactory;
-    const runner = new AgentRunner(fakeGateway().gateway, fakeTool().tool, contexts);
+    const runner = new AgentRunner(fakeGateway().gateway, [fakeTool().tool], contexts);
 
     const events = await collect(runner.run(QUESTION, signal));
 
@@ -633,5 +653,93 @@ describe('the first thing a generation says', () => {
     // A generation that never starts must not announce that it did — a client
     // would clear the composer and wait for a stream that is already over.
     expect(events.map((event) => event.type)).toEqual(['error']);
+  });
+});
+
+/**
+ * The runner sends whatever tools it was given and dispatches on the name the
+ * model came back with. It has no idea what any of them do, which is the whole
+ * of what `AgentTool` bought — a third tool is a provider and a class, and
+ * nothing in this file changes.
+ */
+describe('more than one tool', () => {
+  const second: AgentTool = {
+    definition: {
+      name: 'describe_coverage',
+      description: 'what the dataset covers',
+      parameters: { type: 'object', properties: {} },
+    },
+    execute: async (toolCallId) =>
+      await Promise.resolve({ ...APPLE, toolCallId, sql: 'SELECT count(*) FROM financial_data' }),
+  };
+
+  function runnerOver(gateway: FakeGateway, tools: readonly AgentTool[]): AgentRunner {
+    const contexts = { current: () => CONTEXT } as unknown as GenerationContextFactory;
+    return new AgentRunner(gateway.gateway, tools, contexts);
+  }
+
+  it('offers the model every one of them, in the order they were bound', async () => {
+    const first = fakeTool();
+    const gateway = fakeGateway(says('Apple earned $383.3B.'));
+
+    await collect(runnerOver(gateway, [first.tool, second]).run(QUESTION, signal));
+
+    expect(gateway.sent[0]?.tools.map((tool) => tool.name)).toEqual([
+      'query_financial_data',
+      'describe_coverage',
+    ]);
+  });
+
+  it('sends a call to the tool the model named, and to no other', async () => {
+    const first = fakeTool();
+    const gateway = fakeGateway(
+      [
+        {
+          kind: 'tool_calls',
+          calls: [{ id: 'call_1', name: 'describe_coverage', arguments: '{}' }],
+        },
+        { kind: 'finish', reason: 'tool_calls' },
+      ],
+      says('Apple earned $383.3B.'),
+    );
+
+    const events = await collect(runnerOver(gateway, [first.tool, second]).run(QUESTION, signal));
+
+    expect(first.asked).toEqual([]);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'tool_call_ready',
+        sql: 'SELECT count(*) FROM financial_data',
+      }),
+    );
+  });
+
+  it('tells the model when it asks for a tool that does not exist', async () => {
+    // The alternative is a generation that ends on a name the model made up.
+    // It picked from a list; being told which names are on it is something it
+    // can act on, and the next round usually does.
+    const first = fakeTool();
+    const gateway = fakeGateway(
+      [
+        {
+          kind: 'tool_calls',
+          calls: [{ id: 'call_1', name: 'read_the_news', arguments: '{}' }],
+        },
+        { kind: 'finish', reason: 'tool_calls' },
+      ],
+      says('Apple earned $383.3B.'),
+    );
+
+    const events = await collect(runnerOver(gateway, [first.tool, second]).run(QUESTION, signal));
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'tool_result',
+        error:
+          'There is no tool called read_the_news. The tools available are: query_financial_data, describe_coverage.',
+      }),
+    );
+    // And the generation carried on to answer, rather than ending there.
+    expect(events.at(-1)).toMatchObject({ type: 'finished', outcome: 'answered' });
   });
 });

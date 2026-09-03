@@ -1,12 +1,11 @@
 import type { Violation } from '@fca/contracts';
 import { openGate, type GateEvent } from '@fca/grounding';
-import { z } from 'zod';
 
 import type { AgentEvent } from './agent-events';
 import type { GenerationContext } from './generation-context';
-import type { FinancialQueryTool } from './ports/financial-query.tool.port';
-import type { LlmGateway, ToolCall } from './ports/llm-gateway.port';
-import { QUERY_TOOL } from './prompt.factory';
+import type { AgentTool } from './ports/agent-tool.port';
+import type { CompletionRequest, LlmGateway, ToolCall } from './ports/llm-gateway.port';
+import type { QueryOutcome } from './ports/tool-outcome';
 import { toPreview } from './query-outcome';
 import type { Transcript } from './transcript';
 
@@ -39,12 +38,10 @@ export type Written =
   /** The model kept asking the database and never answered. */
   | { readonly kind: 'exhausted' };
 
-const toolArguments = z.object({ sql: z.string() });
-
 export class Draft {
   constructor(
     private readonly gateway: LlmGateway,
-    private readonly tool: FinancialQueryTool,
+    private readonly tools: readonly AgentTool[],
     private readonly context: GenerationContext,
   ) {}
 
@@ -75,7 +72,7 @@ export class Draft {
     // A controller of our own, so a violation can stop the stream without
     // touching the caller's signal — which means something else entirely.
     const local = new AbortController();
-    const request = transcript.toRequest([QUERY_TOOL], this.context.maxOutputTokens);
+    const request = this.ask(transcript);
 
     let text = '';
     let calls: readonly ToolCall[] = [];
@@ -133,14 +130,12 @@ export class Draft {
     transcript: Transcript,
   ): AsyncGenerator<AgentEvent> {
     for (const call of calls) {
-      const asked = sqlIn(call.arguments);
-
-      // One query at a time, in the order they were asked for: a later one may
+      // One call at a time, in the order they were asked for: a later one may
       // be written to follow from what an earlier one returned.
       // eslint-disable-next-line no-await-in-loop -- see above
-      const outcome = await this.tool.execute(call.id, asked ?? '');
+      const outcome = await this.run(call);
 
-      yield { type: 'tool_call_ready', id: call.id, sql: outcome.sql ?? asked ?? call.arguments };
+      yield { type: 'tool_call_ready', id: call.id, sql: outcome.sql ?? call.arguments };
       yield {
         type: 'tool_result',
         toolCallId: call.id,
@@ -152,6 +147,47 @@ export class Draft {
       transcript.appendToolResult(outcome);
     }
   }
+
+  /** Whatever tools this generation was given, and how much it may write. */
+  private ask(transcript: Transcript): CompletionRequest {
+    return transcript.toRequest(
+      this.tools.map((tool) => tool.definition),
+      this.context.maxOutputTokens,
+    );
+  }
+
+  /**
+   * Dispatch by the name the model used. A name nothing answers to is an outcome
+   * like any other rather than an error: the model picked from a list it was
+   * given, and telling it which names are on that list is something it can act
+   * on — whereas ending the generation is not.
+   */
+  private async run(call: ToolCall): Promise<QueryOutcome> {
+    const tool = this.tools.find((candidate) => candidate.definition.name === call.name);
+    if (tool === undefined) return await Promise.resolve(noSuchTool(call, this.tools));
+
+    return await tool.execute(call.id, call.arguments);
+  }
+}
+
+function noSuchTool(call: ToolCall, tools: readonly AgentTool[]): QueryOutcome {
+  const names = tools.map((tool) => tool.definition.name).join(', ');
+
+  return {
+    toolCallId: call.id,
+    sql: null,
+    columns: [],
+    rows: [],
+    display: new Map(),
+    rowCount: 0,
+    truncated: null,
+    elapsedMs: 0,
+    fromCache: false,
+    failure: {
+      kind: 'unknown_tool',
+      message: `There is no tool called ${call.name}. The tools available are: ${names}.`,
+    },
+  };
 }
 
 interface Cleared {
@@ -207,14 +243,4 @@ function usageOf(
     cachedInputTokens: usage.cachedPromptTokens,
     model,
   };
-}
-
-/** The one argument this tool takes, read at the boundary where it arrives. */
-function sqlIn(argumentsJson: string): string | null {
-  try {
-    const parsed = toolArguments.safeParse(JSON.parse(argumentsJson));
-    return parsed.success ? parsed.data.sql : null;
-  } catch {
-    return null;
-  }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { QueryOutcome } from '../ports/financial-query.tool.port';
+import type { QueryOutcome } from '../ports/tool-outcome';
 import { QUERY_TOOL } from '../prompt.factory';
 import { Transcript, type PastTurn } from '../transcript';
 

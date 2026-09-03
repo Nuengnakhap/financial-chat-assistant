@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { CpuPool } from '../../../shared/cpu/cpu-pool';
 import { FinancialQueryPool } from '../../../shared/financial/financial-query.pool';
+import type { QueryOutcome } from '../../application/ports/tool-outcome';
 import type { CachedFinancialQuery } from '../cached-financial-query';
 import { FINANCIAL_DATA_COLUMNS, FINANCIAL_DATA_TABLE } from '../financial-data.table';
 import { PgFinancialQueryTool } from '../financial-query.tool';
@@ -265,6 +266,11 @@ describe('the tool, end to end', () => {
       await Promise.resolve(Math.ceil(text.length / 4)),
   } as unknown as CpuPool;
 
+  /** The arguments as the model writes them: this tool takes one, called `sql`. */
+  function asking(toolCallId: string, sql: string): Promise<QueryOutcome> {
+    return toolOn().execute(toolCallId, JSON.stringify({ sql }));
+  }
+
   function toolOn(): PgFinancialQueryTool {
     const query = {
       rows: async (sql: Parameters<FinancialQueryPool['query']>[0]) => ({
@@ -285,7 +291,7 @@ describe('the tool, end to end', () => {
       ]),
     };
 
-    const outcome = await toolOn().execute(
+    const outcome = await asking(
       'call-1',
       `SELECT company, revenue FROM ${FINANCIAL_DATA_TABLE} WHERE ticker = 'AAPL' AND year = 2024`,
     );
@@ -302,7 +308,7 @@ describe('the tool, end to end', () => {
 
   it('hands back what the server said when the server refuses', async () => {
     // Allowed by the policy, rejected by PostgreSQL: a year is an integer.
-    const outcome = await toolOn().execute(
+    const outcome = await asking(
       'call-1',
       `SELECT company FROM ${FINANCIAL_DATA_TABLE} WHERE year = 'not a year'`,
     );
@@ -314,7 +320,7 @@ describe('the tool, end to end', () => {
   it('is cut off by the role when a query it allowed runs long', async () => {
     // A cross join of the table with itself, ordered — allowed by the policy,
     // and stopped by the three-second ceiling rather than by anything here.
-    const outcome = await toolOn().execute(
+    const outcome = await asking(
       'call-1',
       `SELECT count(*) FROM ${FINANCIAL_DATA_TABLE} a JOIN ${FINANCIAL_DATA_TABLE} b ON a.year > 0 JOIN ${FINANCIAL_DATA_TABLE} c ON c.year > 0 JOIN ${FINANCIAL_DATA_TABLE} d ON d.year > 0 JOIN ${FINANCIAL_DATA_TABLE} e ON e.year > 0`,
     );
