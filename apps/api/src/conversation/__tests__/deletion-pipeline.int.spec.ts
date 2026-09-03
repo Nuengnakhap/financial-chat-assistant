@@ -20,7 +20,13 @@ import { APP_CONFIG } from '../../shared/config/app-config.token';
 import { DomainErrorFilter } from '../../shared/http/domain-error.filter';
 import { AppLogger, createPinoLogger } from '../../shared/observability/app-logger';
 import { startHarness, type Harness } from '../../shared/persistence/__tests__/harness';
-import { conversations, messages, outboxEvents } from '../../shared/persistence/schema';
+import {
+  conversations,
+  messages,
+  outboxEvents,
+  usageEvents,
+  users,
+} from '../../shared/persistence/schema';
 import { DOMAIN_EVENT_HANDLERS, type DomainEventHandler } from '../../shared/queue/domain-events';
 import { QueueModule } from '../../shared/queue/queue.module';
 import { GENERATION_BUDGET, type GenerationBudget } from '../application/ports/budget.port';
@@ -216,6 +222,40 @@ describe('deleting a conversation', () => {
       return rows.length === 0;
     }, 'the redelivery to be handled');
     expect(await conversationCount()).toBe(0);
+  });
+
+  it('does not give the quota back', async () => {
+    // The invariant `usage_events.message_id` has no foreign key in order to
+    // hold, and nothing had ever watched it. Deleting a conversation cascades
+    // to its messages; if the ledger followed, anybody could refill a spent
+    // window by tidying up after themselves.
+    const jar = await signUp('ada@example.com');
+    const id = await startConversationWithAMessage(jar);
+    const [message] = await harness.db.select().from(messages);
+    const [ada] = await harness.db.select().from(users);
+    if (message === undefined || ada === undefined) throw new Error('the fixture wrote nothing');
+    await harness.db.insert(usageEvents).values({
+      userId: ada.id,
+      messageId: message.id,
+      windowStart: new Date(),
+      model: 'gpt-5.6-luna',
+      inputTokens: 100,
+      cachedInputTokens: 0,
+      outputTokens: 20,
+      costMicroUsd: 1_234n,
+    });
+
+    await call('DELETE', `/api/v1/conversations/${id}`, jar);
+    await until(async () => (await conversationCount()) === 0, 'the conversation to be removed');
+
+    const spent = await harness.db.select().from(usageEvents);
+    expect(spent).toHaveLength(1);
+    // As a string, so a failure can be printed: a `bigint` in a diff crashes
+    // the reporter, which turns a red test into a dead worker.
+    expect(spent[0]?.costMicroUsd.toString()).toBe('1234');
+    // The message it belonged to is gone, and the charge is not — which is only
+    // possible because nothing declared that column a foreign key.
+    expect(await harness.db.select().from(messages)).toEqual([]);
   });
 
   it('leaves a conversation nobody asked to delete alone', async () => {
