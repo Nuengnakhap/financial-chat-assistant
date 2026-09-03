@@ -27,12 +27,13 @@
     "test": "vitest run --project '!integration'",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check": "pnpm build && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
+    "check": "pnpm build && pnpm format:check && pnpm typecheck && pnpm lint && pnpm db:check && pnpm test",
     "test:integration": "vitest run --project integration",
     "eval": "vitest run --project eval --reporter=verbose",
     "contracts:snapshot": "CONTRACTS_SNAPSHOT=write vitest run --project tools contract-surface",
     "db:migrate": "pnpm --filter @fca/api db:migrate",
-    "db:generate": "pnpm --filter @fca/api db:generate"
+    "db:generate": "pnpm --filter @fca/api db:generate",
+    "db:check": "pnpm --filter @fca/api db:check"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

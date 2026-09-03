@@ -10,6 +10,7 @@
     "dev": "tsc -b tsconfig.build.json --watch --preserveWatchOutput & node --env-file-if-exists=../../.env --watch dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
