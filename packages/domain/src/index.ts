@@ -58,6 +58,7 @@ export {
   transitionMessage,
   type MessageStatus,
 } from './conversation/message-status.machine';
+export { asModelSafeText } from './conversation/model-safe-text';
 export { titleFromMessage } from './conversation/title';
 export {
   GENERATION_PHASES,

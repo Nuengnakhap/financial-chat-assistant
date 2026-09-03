@@ -2,12 +2,14 @@ import { isErr, isOk, type Result } from '@fca/domain';
 import { parseSync } from 'pgsql-parser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { Counters } from '../../../shared/observability/counters';
 import {
   SQL_RULES,
   type QueryPlan,
   type SqlRule,
   type SqlViolation,
 } from '../../application/ports/sql-policy.port';
+import { CountingSqlPolicy } from '../counting-sql-policy';
 import { inspect } from '../pg-ast';
 import { PgAstSqlPolicy } from '../pg-ast-sql-policy';
 import { ALLOWED_KEYS, MAX_ROWS, MAX_SQL_LENGTH } from '../sql-allowlist';
@@ -399,5 +401,36 @@ describe('the allowlist', () => {
 
   it('holds the row ceiling the documents agree on', () => {
     expect(MAX_ROWS).toBe(50);
+  });
+});
+
+/**
+ * The wrapper the module actually binds, kept beside the corpus it counts: the
+ * port's own docstring asked for a violation to be countable per rule without
+ * parsing its message, and until now nothing counted.
+ */
+describe('counting what was refused', () => {
+  const counted = (sql: string): Record<string, number> => {
+    const counters = new Counters();
+    new CountingSqlPolicy(policy, counters).validate(sql);
+
+    return { ...counters.snapshot() };
+  };
+
+  it('names the rule that refused it, not just that something was refused', () => {
+    expect(counted('SELECT * FROM users')).toEqual({ 'sql.refused{table}': 1 });
+    expect(counted('DELETE FROM financial_data')).toEqual({ 'sql.refused{not_a_select}': 1 });
+  });
+
+  it('counts nothing for a query that was allowed', () => {
+    expect(counted('SELECT company FROM financial_data')).toEqual({});
+  });
+
+  it('hands the verdict back unchanged, whichever it was', () => {
+    const wrapped = new CountingSqlPolicy(policy, new Counters());
+
+    expect(wrapped.validate('SELECT * FROM users')).toEqual(policy.validate('SELECT * FROM users'));
+    const allowed = wrapped.validate('SELECT company FROM financial_data');
+    expect(allowed.ok).toBe(true);
   });
 });

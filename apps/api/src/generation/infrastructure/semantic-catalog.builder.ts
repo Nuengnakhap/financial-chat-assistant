@@ -28,7 +28,7 @@ import {
  */
 
 /** Bumped when `renderSystemPrompt` changes shape, since the prefix then differs. */
-const CATALOG_FORMAT = 2;
+const CATALOG_FORMAT = 3;
 
 @Injectable()
 export class SemanticCatalogBuilder implements CatalogSource {

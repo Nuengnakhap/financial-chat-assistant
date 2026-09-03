@@ -2,6 +2,7 @@ import {
   ConflictError,
   Err,
   Ok,
+  asModelSafeText,
   isErr,
   titleFromMessage,
   type ClientMessageId,
@@ -75,6 +76,12 @@ export class StartGenerationUseCase {
     scope: OwnerScope,
     sent: StartGeneration,
   ): Promise<Result<StartedGeneration, DomainError>> {
+    // Here, and nowhere later. What is stored, what is shown back on screen,
+    // what titles the conversation and what the model reads are then one
+    // string — sanitising further downstream would make the question a person
+    // sees differ from the one that was answered.
+    const asked = { ...sent, content: asModelSafeText(sent.content) };
+
     // Before the transaction, because it is not a database write and cannot
     // join one — and before the question is stored, because a question written
     // down against a refusal sits in the transcript with no answer coming.
@@ -82,7 +89,7 @@ export class StartGenerationUseCase {
     if (isErr(held)) return held;
 
     try {
-      return await this.startWith(held.value, scope, sent);
+      return await this.startWith(held.value, scope, asked);
     } catch (error) {
       // Nothing below this line starts a generation, so the claim goes back
       // here rather than in each of the four ways this can end.
