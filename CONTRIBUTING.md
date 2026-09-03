@@ -244,14 +244,16 @@ until the note matches what the file actually locks.
 
 ## What to do instead
 
-| Tempting                                             | Why it is a trap                                                                                                   |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| A special case in `AgentRunner` for one tool         | That is what `AgentTool` is for. If a tool cannot be added without editing the runner, the port is wrong           |
-| Parsing SQL outside `PgAstSqlPolicy`                 | Two answers to "what may run", and the second one is the one that gets it wrong                                    |
-| A number formatted anywhere but `packages/grounding` | The formatter and the verifier must agree by construction, not by luck                                             |
-| `assertNever` in the SSE reducer                     | It breaks forward compatibility, which is the point of the union                                                   |
-| A `float` anywhere near the budget                   | `MicroUsd` exists because `0.1 + 0.2 !== 0.3`                                                                      |
-| A `pg.Pool` without an `error` listener              | A connection that dies while idle ends the Node process. Measured: stopping Postgres under a running API killed it |
-| A counter keyed on anything from a request           | `Counters` takes a name from a closed union and a label from a fixed set, for the reason `LogContext` does         |
-| An e2e test that asserts what the model said         | That is `pnpm eval:live`, which reports. The browser suite asserts the machinery around the answer                 |
-| Reading coverage from a constant                     | It comes from the database at runtime, so reseeding moves the prompt, the refusals and the verifier together       |
+| Tempting                                              | Why it is a trap                                                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A special case in `AgentRunner` for one tool          | That is what `AgentTool` is for. If a tool cannot be added without editing the runner, the port is wrong           |
+| Parsing SQL outside `PgAstSqlPolicy`                  | Two answers to "what may run", and the second one is the one that gets it wrong                                    |
+| A number formatted anywhere but `packages/grounding`  | The formatter and the verifier must agree by construction, not by luck                                             |
+| `assertNever` in the SSE reducer                      | It breaks forward compatibility, which is the point of the union                                                   |
+| A `float` anywhere near the budget                    | `MicroUsd` exists because `0.1 + 0.2 !== 0.3`                                                                      |
+| A `pg.Pool` without an `error` listener               | A connection that dies while idle ends the Node process. Measured: stopping Postgres under a running API killed it |
+| A counter keyed on anything from a request            | `Counters` takes a name from a closed union and a label from a fixed set, for the reason `LogContext` does         |
+| An e2e test that asserts what the model said          | That is `pnpm eval:live`, which reports. The browser suite asserts the machinery around the answer                 |
+| Reading coverage from a constant                      | It comes from the database at runtime, so reseeding moves the prompt, the refusals and the verifier together       |
+| A command in a README that is not in a `package.json` | Documentation is a promise. `tools/docs/` fails the build on one that cannot be typed, because nothing else can    |
+| A `preview` config that does not mirror `server`      | `vite preview` inherits nothing, so the built page is the only place that breaks — and the only one worth shipping |
